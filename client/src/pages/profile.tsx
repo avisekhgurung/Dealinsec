@@ -981,9 +981,9 @@ export default function ProfilePage() {
                     </p>
                     <p className="text-sm text-white/60 mt-1">
                       {hasActivePro(user)
-                        ? `${DEAL_SUITE_HIDDEN ? "Everything unlocked" : "Unlimited workflow"}${user?.planExpiresAt ? ` · until ${new Date(user.planExpiresAt).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}` : ""}`
+                        ? `More searches, drafts and seats${user?.planExpiresAt ? ` · until ${new Date(user.planExpiresAt).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}` : ""}`
                         : hasActiveTrial(user)
-                          ? `${getTrialDaysLeft(user) === 1 ? "Last day" : `${getTrialDaysLeft(user)} days left`} · everything unlocked`
+                          ? `${getTrialDaysLeft(user) === 1 ? "Last day" : `${getTrialDaysLeft(user)} days left`} · Pro allowances`
                           : DEAL_SUITE_HIDDEN
                             ? "Upgrade for more AI searches, drafts and coworker tasks"
                             : "Deals & quotations · upgrade for agreements and invoices"}

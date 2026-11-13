@@ -20,6 +20,7 @@
 import { LANDING_FAQS } from "@shared/landing-faqs";
 import { guidesHtml } from "./blog";
 import { ONE_LINER, PRICING, SUPPORTING_LINE, TAGLINE, WORKFLOW } from "@shared/product-facts";
+import { DEAL_SUITE_LABEL } from "@shared/nav-model";
 import { OUTBOUND_ALLOWANCE_DEFAULTS as OB, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
 
 const FAQS = LANDING_FAQS;
@@ -48,15 +49,21 @@ export function landingSeoBody(): string {
 
   return `<div id="seo-fallback">
 <h1>${TAGLINE}</h1>
-<p>${ONE_LINER} ${SUPPORTING_LINE} AI researches and drafts; you approve every message and send it yourself, and nothing is sent automatically. Free plan: the whole deal-to-invoice flow with no monthly cap, the lead pipeline and ${OB.free.monthlySearches} AI research searches every ${OUTBOUND_WINDOW_DAYS} days. Pro: ₹${PRICING.proMonthlyInr} a month in India.</p>
+<p>${ONE_LINER} ${SUPPORTING_LINE} AI researches and drafts; you approve every message and send it yourself, and nothing is sent automatically. Free plan: the whole deal-to-invoice flow with no monthly cap, the lead pipeline and ${OB.free.monthlySearches} AI research searches every ${OUTBOUND_WINDOW_DAYS} days. Pro: ₹${PRICING.proMonthlyInr} a month in India. Booster packs add searches or drafts when a month runs short.</p>
 
-<h2>How it works: from a search to a client conversation</h2>
+<h2>What is DealInSec? Client-finding software for freelancers and small agencies in India</h2>
+<p>DealInSec is one workspace that finds the client, wins the deal and gets you paid, built first for freelancers, consultants and small service agencies in India. It has three parts. <strong>Client Radar</strong> finds clients: describe the companies you want and where, and it researches companies that fit, with a dated reason to reach out and its source, a named decision maker where one is published, and a score with its reasons; it can also list local businesses in a city from Google Maps. <strong>AI Team</strong> (Nibo, Mika and Zee) does the legwork in the background: research, first-message drafts and a daily briefing, each asking you before anything that matters. The <strong>${DEAL_SUITE_LABEL}</strong> wins the deal and gets you paid: a deal, a quotation your client accepts online, the agreement they sign online, the invoice and payment tracking, free on every plan with no monthly cap. It is not a contact database, not a marketplace, and it never sends on its own: you approve every message and send it yourself.</p>
+
+<h2>How it works: from a search to a paid invoice</h2>
 <ol>
 <li><strong>Describe who you want; AI researches</strong> (Free): say who you want to work with and where, in any country, or list local businesses in a city from Google Maps (for example dentists in Siliguri); Client Radar checks each company's own website against your profile and shows recent, dated signals with their sources. Inferences are labelled as possible opportunities, not facts, and nobody is contacted until you choose.</li>
 <li><strong>Approve the first message and send it</strong> (Free): AI drafts a first message from the verified facts about the company — or you write your own. You edit and approve the exact text and send it yourself from your own email, WhatsApp or LinkedIn; a do-not-contact list is checked first. DealInSec doesn't send messages for you and never contacts anyone on its own.</li>
 <li><strong>Track replies, next steps and follow-ups</strong> (Free): every prospect becomes a lead with a stage, recorded facts with sources, a next step and a follow-up date, so no conversation goes quiet by accident. Follow-up drafts are prepared when due, for you to approve and send.</li>
 <li><strong>When you win the work, the paperwork follows</strong> (Free): a won lead becomes a deal with its quotation your client accepts online, then the agreement they sign, the invoice and payment tracking — all free, on every plan. Protection Check flags missing terms first, and DealInSec never processes your clients' payments.</li>
 </ol>
+
+<h2>${DEAL_SUITE_LABEL}: deal to invoice, free on every plan</h2>
+<p>When you win the work, the paperwork follows from the same deal, at no cost on any plan and with no monthly cap: create the deal (client, engagement model, value, dates, deliverables), send a versioned quotation your client opens and accepts online, generate the agreement with your standard and custom terms for your client to sign online with an audit record of who signed and when, raise invoices (one, an advance and a balance, or milestones, never more than the agreement) with your business and tax details printed, and mark each one paid as the money arrives to see what is paid, pending and overdue. Protection Check reads the terms first and flags what is missing or risky, such as no advance or unlimited revisions. Documents use your own currency: rupees with PAN and GSTIN for India, and 50 currencies for clients elsewhere. Signing is electronic acceptance, not a certified digital signature; in-app invoices are not GST tax invoices; your client pays you directly and DealInSec never collects or holds the money. Pro does not change any of this: it only buys more AI client research, more AI drafts and team seats.</p>
 
 <h2>What DealInSec does</h2>
 <ul>
@@ -120,7 +127,7 @@ export function landingSeoBody(): string {
 ${guidesHtml()}
 
 <h2>Start free. Upgrade when you need more.</h2>
-<p>The free plan is permanent: ${OB.free.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.free.maxCompanies} companies each), the leads pipeline, and the whole deal-to-invoice flow with no monthly cap. It needs no card, in every country. Pro is ₹${PRICING.proMonthlyInr} a month in India and includes ${OB.pro.monthlySearches} AI searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.pro.maxCompanies} companies each), unlimited deals, agreements your client signs online, invoices, payment tracking and up to 5 team members. Searches are counted over a rolling ${OUTBOUND_WINDOW_DAYS} days, with at most 5 a day; when you reach the limit, more become available as earlier searches pass ${OUTBOUND_WINDOW_DAYS} days, and nothing is unlimited. Pro is paid once a month with no auto-renewal: pay again to extend, or it returns to the free plan. In the United States and other countries the free plan is open; paid plans can't be bought from outside India yet. No platform fee on your deal value.</p>
+<p>The free plan is permanent: ${OB.free.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.free.maxCompanies} companies each), the leads pipeline, and the whole deal-to-invoice flow with no monthly cap. It needs no card, in every country. Pro is ₹${PRICING.proMonthlyInr} a month in India and includes ${OB.pro.monthlySearches} AI searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.pro.maxCompanies} companies each), ${OB.pro.monthlyDrafts} AI outreach drafts and up to 5 team members; the deal-to-invoice flow is free on every plan, so Pro buys more client finding, not a different product. Searches are counted over a rolling ${OUTBOUND_WINDOW_DAYS} days, with at most 5 a day; when you reach the limit, more become available as earlier searches pass ${OUTBOUND_WINDOW_DAYS} days, or a one-time booster pack of extra searches or drafts, bought in the app under Credits &amp; usage, covers the next ones right away. Booster credits are spent only after the plan's own allowance, never renew and stay yours if the plan ends; nothing is unlimited. Pro is paid once a month with no auto-renewal: pay again to extend, or it returns to the free plan. In the United States and other countries the free plan is open; paid plans can't be bought from outside India yet. No platform fee on your deal value.</p>
 
 <h2>Frequently asked questions</h2>
 ${faqs}

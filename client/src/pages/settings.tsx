@@ -35,7 +35,7 @@ import {
 } from "@shared/permissions";
 import {
   ArrowLeft, Building2, Users, ScrollText, CreditCard, UserPlus, Crown,
-  Mail, RotateCw, Trash2, Loader2, Sparkles, Rocket, Sun, Moon, Monitor, Download,
+  Mail, RotateCw, Trash2, Loader2, Sparkles, Rocket, Sun, Moon, Monitor, Download, Zap,
   SlidersHorizontal, Check, Shield, Pencil, Plus, Plug,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1000,6 +1000,11 @@ export default function SettingsPage() {
                         <Sparkles className="w-4 h-4 mr-2" /> Manage plan
                       </Button>
                     </Link>
+                    <Link href="/wallet#boosters">
+                      <Button variant="outline" data-testid="button-boosters">
+                        <Zap className="w-4 h-4 mr-2" /> Booster packs
+                      </Button>
+                    </Link>
                     {!isSolo && (
                       <Link href="/pricing#seats">
                         <Button variant="outline" data-testid="button-buy-seats">
@@ -1053,7 +1058,7 @@ export default function SettingsPage() {
                   </p>
                 )}
                 <p className="text-sm text-muted-foreground max-w-md">
-                  See what your plan includes, the extra searches and AI drafts you&apos;ve bought, and your history.{" "}
+                  See what your plan includes, buy a booster pack when a month runs short, and see the credits you&apos;ve bought and your history.{" "}
                   <Link href="/wallet" className="font-semibold text-primary hover:underline" data-testid="link-wallet">Credits &amp; usage</Link>
                 </p>
                 {!canBilling && (

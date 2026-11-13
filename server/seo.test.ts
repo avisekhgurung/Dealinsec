@@ -704,7 +704,7 @@ describe("homepage crawler fallback: small agencies first, freelancers and creat
   const body = landingSeoBody();
 
   it("leads with the brand promise, freelancers, consultants and small agencies, and the whole workflow to payment tracking", () => {
-    expect(body).toContain("<h1>Your AI team finds clients for you.</h1>");
+    expect(body).toContain("<h1>Find clients. Win deals. Get paid.</h1>");
     expect(body.match(/<h1[\s>]/g)?.length).toBe(1);
     expect(body).toContain("AI researches and drafts; you approve every message and send it yourself, and nothing is sent automatically.");
     for (const step of ["Describe who you want; AI researches", "Approve the first message and send it", "Track replies, next steps and follow-ups", "When you win the work, the paperwork follows"]) expect(body, step).toContain(step);

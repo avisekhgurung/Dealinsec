@@ -129,8 +129,7 @@ function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | 
             <p className="text-xs text-muted-foreground">
               Unlimited deals &amp; quotations
               {user?.dealBoostExpiresAt ? ` · until ${fmtDate(user.dealBoostExpiresAt)}` : ""}
-              {" · agreements & invoices need Pro"}
-            </p>
+                          </p>
           </div>
           <Link href="/pricing">
             <Button variant="outline" size="sm" className="flex-shrink-0">Upgrade to Pro</Button>

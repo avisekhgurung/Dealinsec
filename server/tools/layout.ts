@@ -590,7 +590,7 @@ function ctaBand(): string {
     <div class="cta-ico">${clock}</div>
     <div class="cta-copy">
       <h2>Find clients. Win deals. Get paid.</h2>
-      <p>For freelancers, consultants and small agencies, wherever you bill from: find clients with Client Radar, get help from your AI Team, then quotation, an agreement signed online, invoice and payment follow-up for each client, in your own currency. Free to start, with no card, in every country. Paid plans can currently be bought in India (₹${PRICING.proMonthlyInr}/month).</p>
+      <p>For freelancers, consultants and small agencies, wherever you bill from: find clients with Client Radar, get help from your AI Team, then a quotation, an agreement signed online, the invoice and payment follow-up for each client, in your own currency, free on every plan with no monthly cap. No card, in every country. Pro (₹${PRICING.proMonthlyInr}/month, bought in India) adds more AI client research and drafts.</p>
     </div>
     <a class="btn" href="${APP_LINK}" data-cta>Get started free →</a>
   </div></div>`;
@@ -666,7 +666,7 @@ function brandModal(): string {
         <ul class="bm-list">
           <li>Remove the &ldquo;Made with DealInSec&rdquo; footer</li>
           <li><b>Deals and invoices, free</b> &mdash; run real deals with quotations, with no monthly cap</li>
-          <li>Agreements signed online, invoices and payment tracking with Pro &mdash; paid plans can currently be bought in India (₹${PRICING.proMonthlyInr}/month)</li>
+          <li>Agreements signed online, invoices and payment tracking, free on every plan; Pro (₹${PRICING.proMonthlyInr}/month, bought in India) adds more AI client research and drafts</li>
         </ul>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
           <a class="btn" href="${APP_SIGNUP}" data-cta style="flex:1;min-width:150px;justify-content:center">Sign up free →</a>

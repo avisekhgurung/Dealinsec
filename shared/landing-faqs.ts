@@ -49,7 +49,7 @@ export const LANDING_FAQS: LandingFaq[] = [
   },
   {
     q: "How are agreements, invoices and payments managed?",
-    a: "On Pro, the agreement is generated from the deal with your standard and custom terms, and your client signs it online through a link, with an audit record of who signed and when (it is electronic acceptance, not a certified digital signature). Invoices are generated from the agreement, as one invoice, an advance and a final payment, or milestones, and can never exceed the agreement. Your client pays you directly; you mark each invoice paid, and DealInSec shows what is paid, pending and overdue. It never collects or moves your client's money, and in-app invoices are not GST tax invoices.",
+    a: "Free, on every plan, with no monthly cap: the agreement is generated from the deal with your standard and custom terms, and your client signs it online through a link, with an audit record of who signed and when (it is electronic acceptance, not a certified digital signature). Invoices are generated from the agreement, as one invoice, an advance and a final payment, or milestones, and can never exceed the agreement. Your client pays you directly; you mark each invoice paid, and DealInSec shows what is paid, pending and overdue. It never collects or moves your client's money, and in-app invoices are not GST tax invoices.",
   },
   {
     q: "How do billing and cancellation work?",
@@ -57,7 +57,19 @@ export const LANDING_FAQS: LandingFaq[] = [
   },
   {
     q: "What happens when I reach my AI search limit?",
-    a: `Searches are counted over a rolling ${OUTBOUND_WINDOW_DAYS} days, with at most 5 a day, and a search that stopped before searching the web isn't counted. On the free plan you can upgrade to Pro or wait; on Pro, more searches become available as earlier ones pass ${OUTBOUND_WINDOW_DAYS} days. Searching is never unlimited, and everything you already found stays in your workspace.`,
+    a: `Searches are counted over a rolling ${OUTBOUND_WINDOW_DAYS} days, with at most 5 a day, and a search that stopped before searching the web isn't counted. On the free plan you can upgrade to Pro, buy a booster pack or wait; on Pro, more searches become available as earlier ones pass ${OUTBOUND_WINDOW_DAYS} days, or a booster pack covers the next ones right away. Only searching pauses: your leads, drafts and the whole deal-to-invoice flow keep working. Searching is never unlimited, and everything you already found stays in your workspace.`,
+  },
+  {
+    q: "What are booster packs?",
+    a: "One-time credit packs for extra Client Radar searches or extra AI outreach drafts, for when your plan's allowance is used up before it frees up. Buy one in the app under Settings → Plan & billing → Credits & usage; the pack sizes, prices and validity are listed there before you pay. Credits are spent only after your plan's own allowance, never renew, and stay yours if your plan ends. They add capacity to the same features; they don't unlock anything else, and the deal-to-invoice flow never needs them.",
+  },
+  {
+    q: "Is the deal-to-invoice flow really free?",
+    a: "Yes, on every plan and with no monthly cap: create a deal, send a quotation your client accepts online, generate the agreement they sign online, raise invoices (single, advance and balance, or milestones) and track what's paid, pending and overdue. No card is needed. Pro only buys more AI client research, more AI drafts and team seats. Your client pays you directly; DealInSec records the payment and never handles the money.",
+  },
+  {
+    q: "How do I find clients as a freelancer in India?",
+    a: `In DealInSec: describe the clients you want (for example D2C brands in Bengaluru, dental clinics in Pune, or SaaS startups in the US) and where, confirm the profile, and Client Radar researches companies that fit, with a dated reason to reach out and its source for each one. Save the good ones as leads, approve a first message drafted from those facts, send it from your own email or WhatsApp, and let the follow-up tasks keep the conversation alive. The free plan includes ${OB.free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, so you can try it without a card.`,
   },
   {
     q: "Does DealInSec send emails for me?",

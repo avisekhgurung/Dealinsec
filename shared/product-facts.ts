@@ -19,7 +19,9 @@ import { LEAGUE_ALLOWANCE_DEFAULTS as LG, LEAGUE_LIMITS, LEAGUE_WINDOW_DAYS } fr
 const OB = OUTBOUND_ALLOWANCE_DEFAULTS;
 
 export const PRODUCT_NAME = "DealInSec";
-export const TAGLINE = "Your AI team finds clients for you.";
+/** The brand line: what the product does, in the order it happens. The homepage h1, the auth page and every SSR
+ *  call-to-action say exactly this, so search and answer engines meet one claim everywhere. */
+export const TAGLINE = "Find clients. Win deals. Get paid.";
 export const SUPPORT_EMAIL = "support@dealinsec.com";
 
 /** One sentence: what it is. */
@@ -28,7 +30,7 @@ export const ONE_LINER =
 
 /** The line under the headline: the client journey in one place, and what the AI coworkers help with. */
 export const SUPPORTING_LINE =
-  "Your AI coworkers research potential clients, prepare the outreach and keep follow-ups moving; you approve everything that reaches a client.";
+  "Your AI coworkers research potential clients, prepare the outreach and keep follow-ups moving; you approve everything that reaches a client. When you win the work, the quotation, the agreement your client signs online, the invoice and payment tracking are free on every plan.";
 
 /** A short paragraph for summaries, meta descriptions and the top of AI-readable files. */
 export const SUMMARY =
@@ -91,15 +93,15 @@ export const CAPABILITIES: readonly Capability[] = [
     text: "A professional, versioned quotation generated from the deal, with a link the client can open and accept online, and print or PDF.",
   },
   {
-    key: "agreements", name: "Agreements and online signing", status: "live", plan: "pro",
+    key: "agreements", name: "Agreements and online signing", status: "live", plan: "all",
     text: "An agreement generated from the deal, with standard and custom terms, and a link the client can sign online. Signing is electronic acceptance with an audit record of who signed and when; it is not a certified digital signature, and DealInSec gives no legal advice.",
   },
   {
-    key: "invoices", name: "Invoices", status: "live", plan: "pro",
+    key: "invoices", name: "Invoices", status: "live", plan: "all",
     text: "Invoices drawn from the agreement, single or split (for example an advance and a final payment), with your business and tax registration details printed. App invoices don't calculate tax and are not GST tax invoices.",
   },
   {
-    key: "payment_tracking", name: "Payment tracking", status: "live", plan: "pro",
+    key: "payment_tracking", name: "Payment tracking", status: "live", plan: "all",
     text: "Record when an invoice is paid and see what is paid, pending and overdue. DealInSec records payments; it never collects or moves your clients' money.",
   },
   {
@@ -154,6 +156,7 @@ export const PRICING = {
 export const PRICING_LINES: readonly string[] = [
   `Free plan: the work you have already won costs nothing — deals, quotations, agreements signed online, invoices and payment tracking, with no monthly cap on any of them — plus the leads pipeline, ${OB.free.monthlySearches} Client Radar searches a month (up to ${OB.free.maxCompanies} companies each) and ${OB.free.monthlyDrafts} AI outreach drafts a month. Permanent, no card.`,
   `DealInSec Pro: more of the AI that finds clients — Client Radar with ${OB.pro.monthlySearches} searches a month (up to ${OB.pro.maxCompanies} companies each), ${OB.pro.monthlyDrafts} AI outreach drafts a month, and ${PRO_INCLUDED_SEATS} team members. ${rupees(PRICING.proMonthlyInr)} a month in India, paid once a month: it does not renew or charge automatically, you pay again to extend. The deal-to-invoice flow is free on every plan, so Pro buys research and drafting capacity, not a different product. There is no separate plan for Client Radar or the CRM, and no annual plan. Extra team members are ${rupees(PRICING.extraSeatInr)} each a month.`,
+  "Booster packs: one-time credit packs for extra Client Radar searches or extra AI outreach drafts, for when a plan's allowance is used up before it frees up. They are bought in the app under Credits & usage (the prices, pack sizes and validity are listed there), never renew, are spent only after the plan's own allowance, and stay yours if the plan ends. They add capacity to the same features; they do not unlock anything else.",
   PRICING.checkout,
   `Checkout charges exactly the listed price (${rupees(PRICING.proMonthlyInr)} for Pro); DealInSec adds no tax on top of it.`,
   "No platform fee or commission on your deal value.",

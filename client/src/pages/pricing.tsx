@@ -29,6 +29,8 @@ import { PaymentResult } from "@/components/payment-result";
 import { useRazorpayCheckout, type CheckoutPlan } from "@/hooks/use-razorpay-checkout";
 import { PLAN_PRICE_DEFAULTS, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
 import { OUTBOUND_ALLOWANCE_DEFAULTS, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
+import { TopUpPacks } from "@/components/credits/top-up";
+import { Zap } from "lucide-react";
 import { useLocale } from "@/hooks/use-locale";
 import { trackEvent } from "@/lib/analytics";
 
@@ -164,8 +166,8 @@ export default function PricingPage() {
     purchasedPlan === "extra_seat"
       ? "Extra seats added — invite people from Settings."
       : purchasedPlan === "pro_monthly"
-      ? "DealInSec Pro is active — everything unlocked for 1 month."
-      : "DealInSec Pro is active — everything unlocked for 1 year.";
+      ? "DealInSec Pro is active: more searches, drafts and coworker tasks for 1 month."
+      : "DealInSec Pro is active: more searches, drafts and coworker tasks for 1 year.";
 
   return (
     <div className="min-h-screen bg-background pb-20 lg:pb-12">
@@ -202,7 +204,7 @@ export default function PricingPage() {
         successMessage={successMessage}
         chipLabel={
           purchasedPlan === "extra_seat" ? "Extra seats · 1 month"
-          : "Pro · Unlimited workflow"
+          : "Pro · 1 month"
         }
         errorReason={paymentErrorReason}
         continueLabel={redirectAfter ? "Continue where you left off" : undefined}
@@ -441,6 +443,33 @@ export default function PricingPage() {
           </div>
         </Card>
 
+        {/* ── Booster packs: when a month runs short, add searches or drafts without changing the plan ── */}
+        <Card id="boosters" className="glass-card border-amber-300/50 dark:border-amber-700/40 relative overflow-hidden scroll-mt-24">
+          <div className="relative p-4 lg:p-5 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-xl bg-amber-500/15 flex items-center justify-center flex-shrink-0">
+                <Zap className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-sm lg:text-base">Booster packs: ran out before the month did?</p>
+                <p className="text-xs lg:text-sm text-muted-foreground mt-0.5">
+                  One-time packs of extra Client Radar searches or AI outreach drafts, on Free or Pro. They are spent only after your plan&apos;s own allowance, never renew, and stay yours if the plan ends. Only searching or drafting ever pauses: leads, replies and the whole deal-to-invoice flow keep working.
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl border border-border/60 p-3.5 space-y-2">
+                <p className="text-sm font-semibold">Extra Client Radar searches</p>
+                <TopUpPacks kind="search" />
+              </div>
+              <div className="rounded-xl border border-border/60 p-3.5 space-y-2">
+                <p className="text-sm font-semibold">Extra AI outreach drafts</p>
+                <TopUpPacks kind="draft" />
+              </div>
+            </div>
+          </div>
+        </Card>
+
         {/* ── How the free plan works ── */}
         <div className="glass-card rounded-2xl border-0 p-5 space-y-3">
           <h3 className="text-sm font-semibold">How it works</h3>
@@ -467,7 +496,7 @@ export default function PricingPage() {
             ))}
           </div>
           <p className="text-[11px] text-muted-foreground pt-1 border-t border-border/50">
-            Every new account starts on the free plan, no card. Upgrade to Pro when you need more searches, drafts and coworker tasks.
+            Every new account starts on the free plan, no card. Deals, quotations, agreements, invoices and payment tracking are free on every plan. Upgrade to Pro when you need more searches, drafts and coworker tasks, or add a booster pack for one month that runs short.
           </p>
         </div>
 

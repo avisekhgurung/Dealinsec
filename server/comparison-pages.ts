@@ -158,7 +158,7 @@ interface FeatureRow {
 const FEATURES: FeatureRow[] = [
   { label: "Proposals / quotations", cells: { bonsai: "Proposals (Essentials)", moxie: "Proposals, quotes (Starter)", honeybook: "Proposals (Starter)", indy: "Proposals", dealinsec: "Quotations, with a client acceptance link (Free)" } },
   { label: "Contracts / e-signature", cells: { bonsai: "Contracts (Essentials)", moxie: "Contracts (Starter)", honeybook: "Contracts (Starter)", indy: "Contracts", dealinsec: "Agreements with a public signing link (Pro)" } },
-  { label: "Invoicing", cells: { bonsai: "Invoices (Essentials)", moxie: "Invoicing (Starter)", honeybook: "Invoices (Starter)", indy: "Invoices", dealinsec: "Invoices from the agreement (Pro)" } },
+  { label: "Invoicing", cells: { bonsai: "Invoices (Essentials)", moxie: "Invoicing (Starter)", honeybook: "Invoices (Starter)", indy: "Invoices", dealinsec: "Invoices from the agreement (free, every plan)" } },
   { label: "Collects payments online", cells: { bonsai: "Yes — invoices & payments", moxie: "Yes — invoicing & payments", honeybook: "Yes — card fees listed", indy: "—", dealinsec: "No — tracks payment status; your client pays you directly" } },
   { label: "Time tracking", cells: { bonsai: "Yes (Basic)", moxie: "Yes", honeybook: "—", indy: "Yes", dealinsec: "No" } },
   { label: "Client portal", cells: { bonsai: "Yes (Essentials)", moxie: "White-labelled portal (Pro)", honeybook: "Yes (Starter)", indy: "Branded portal (Pro)", dealinsec: "No — public links for a quotation and an agreement" } },
@@ -389,7 +389,7 @@ ${METHODOLOGY(VENDORS)}`,
   <div class="tbl-scroll"><table class="cmp">
     <tr><th>Tool</th><th>Plan</th><th>Price</th><th>What you get</th></tr>
     <tr><td rowspan="2"><b>DealInSec</b><br><span class="muted" style="font-size:13px">Free plan, no card, in every country</span></td><td>Free</td><td>$0 / ₹0</td><td>Deals, quotations, agreements, invoices and payment tracking, uncapped, in every country</td></tr>
-    <tr><td>Pro</td><td>₹299/month (India only)</td><td>Unlimited deals, agreements with a signing link, invoices, payment tracking</td></tr>
+    <tr><td>Pro</td><td>₹299/month (India only)</td><td>More Client Radar searches, more AI outreach drafts and up to 5 team members; deals, agreements with a signing link, invoices and payment tracking are free on every plan</td></tr>
   </table></div>
   ${reviewedNote([vendor("bonsai")])}
   ${AVAILABILITY}

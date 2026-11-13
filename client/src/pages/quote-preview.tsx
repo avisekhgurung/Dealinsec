@@ -443,7 +443,7 @@ export default function QuotePreviewPage() {
             Pro/trial user proceeds straight through, no reason to mention it. */}
         {!hasProAccess(user) && (
           <p className="text-xs text-muted-foreground px-1 pt-4 print:hidden">
-            Your quotation is ready. With Pro, you can create an agreement from this deal, get it signed online and create invoices.
+            Your quotation is ready. Next, create the agreement from this deal, get it signed online and raise the invoices, free on every plan.
           </p>
         )}
 

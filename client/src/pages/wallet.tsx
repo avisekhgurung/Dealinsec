@@ -93,16 +93,19 @@ export default function WalletPage() {
             </section>
 
             {unlimited ? (
-              <Card className="glass-card"><CardContent className="p-4 text-sm" data-testid="wallet-unlimited">This workspace has no monthly limits on searches or AI drafts, so it doesn&apos;t use credits.</CardContent></Card>
+              <Card className="glass-card"><CardContent className="p-4 text-sm" data-testid="wallet-unlimited">This workspace has no monthly limits on searches or AI drafts, so it never spends credits. The booster packs below are what every other workspace sees; buying one here only tests the checkout.</CardContent></Card>
             ) : (
-              <>
                 <section className="grid gap-3 md:grid-cols-2" aria-label="Plan allowance">
                   <AllowanceCard kind="search" label="Client Radar searches" a={w.plan?.searches} credits={w.credits} warn={w.warn} windowDays={w.windowDays} />
                   <AllowanceCard kind="draft" label="AI drafts" a={w.plan?.drafts} credits={w.credits} warn={w.warn} windowDays={w.windowDays} />
                 </section>
-
-                <section className="space-y-3" aria-label="Purchased credits">
-                  <h2 className="text-base font-semibold">Credits you bought</h2>
+            )}
+              <>
+                <section id="boosters" className="scroll-mt-24 space-y-3" aria-label="Booster packs and purchased credits">
+                  <div>
+                    <h2 className="text-base font-semibold">Booster packs</h2>
+                    <p className="text-xs text-muted-foreground">Ran out before the month did? Add searches or drafts without changing your plan. Credits you bought show here too.</p>
+                  </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     {(["search", "draft"] as CreditKind[]).map((k) => (
                       <Card key={k} className="glass-card" data-testid={`wallet-credits-${k}`}>
@@ -185,7 +188,6 @@ export default function WalletPage() {
                   )}
                 </section>
               </>
-            )}
           </>
         )}
       </main>

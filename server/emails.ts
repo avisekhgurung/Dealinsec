@@ -223,7 +223,7 @@ export function welcomeEmail(args: { firstName?: string }): { subject: string; h
     bodyHtml: `
       ${heading(`Welcome aboard${name}!`)}
       ${para("DealInSec helps you track deals, send quotations, sign agreements, and bill clients — all in one workflow.")}
-      ${para("Your free plan is ready: deals and quotations, with no card. Agreements, invoices and payment tracking come with Pro when you need them. Here's your first move:")}
+      ${para("Your free plan is ready: Client Radar to find clients, and deals, quotations, agreements signed online, invoices and payment tracking, all free with no card. Here's your first move:")}
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">
         <tr><td style="padding:6px 0;color:#334155;font-size:14px;">1️⃣ &nbsp;Create your first deal</td></tr>
         <tr><td style="padding:6px 0;color:#334155;font-size:14px;">2️⃣ &nbsp;Send a professional quotation</td></tr>
@@ -311,7 +311,7 @@ export function proPlanReceiptEmail(args: {
     preview: `Your payment of ${paid} was successful. DealInSec Pro is now active.`,
     bodyHtml: `
       ${heading("You're on Pro 🎉")}
-      ${para(`Hi${args.firstName ? " " + args.firstName : ""}, your DealInSec Pro plan is active. Unlimited deals, quotations, agreements and invoices for ${covered} — plus payment tracking.`)}
+      ${para(`Hi${args.firstName ? " " + args.firstName : ""}, your DealInSec Pro plan is active for ${covered}: more Client Radar searches, more AI outreach drafts and room for your team. Deals, quotations, agreements and invoices stay free, as always.`)}
       ${infoCard(
         infoRow("Plan", `DealInSec Pro — ${termLabel}`) +
         infoRow("Workflow", "Unlimited") +

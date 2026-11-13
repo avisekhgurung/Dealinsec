@@ -240,8 +240,8 @@ SESSION_SECRET=<copy the EXISTING value from Render>
 - **`SESSION_SECRET` must be copied, not regenerated.** A new value logs every user out.
 - **Keep `TZ=UTC`.** Render ran UTC. Setting `Asia/Kolkata` would shift follow-up business-day scheduling and the
   30-day allowance windows. Change it later as a deliberate decision, not during a migration.
-- **Do not set `PRO_MONTHLY_PRICE`** — the ₹199 price comes from `shared/product-facts.ts`; an env override
-  reintroduces the old price.
+- **Do not set `PRO_MONTHLY_PRICE`** — the Pro price (₹299 since 12 Nov 2026) comes from `shared/globalPlans.ts` through
+  `shared/product-facts.ts`; an env override reintroduces an old price.
 - **Do not set `PRO_TRIAL_ENABLED`** — the model is free → paid, never a trial.
 - **`BACKGROUND_WORKER`: leave unset.** The web process then runs the durable jobs itself
   (`backgroundWorkIsElsewhere` in [server/workflow/runner.ts:51](../server/workflow/runner.ts) is false when the

@@ -86,7 +86,7 @@ export function TopUpPacks({ kind, onPurchased }: { kind: CreditKind; onPurchase
       ) : config?.razorpayEnabled === false ? (
         <p className="text-xs text-amber-800 dark:text-amber-300">Payments aren&apos;t switched on yet.</p>
       ) : null}
-      <p className="text-xs"><Link href="/wallet" className="font-semibold text-primary hover:underline" data-testid="topup-wallet-link">Your credits and history</Link></p>
+      <p className="text-xs"><Link href="/wallet#boosters" className="font-semibold text-primary hover:underline" data-testid="topup-wallet-link">Your credits and history</Link></p>
     </div>
   );
 }
@@ -98,12 +98,12 @@ export function TopUpPrompt({ kind, label }: { kind: CreditKind; label?: string 
   return (
     <>
       <Button type="button" variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={() => setOpen(true)} data-testid={`button-topup-${kind}`}>
-        <ShoppingCart className="h-3 w-3" aria-hidden />{label ?? `Buy extra ${noun}`}
+        <ShoppingCart className="h-3 w-3" aria-hidden />{label ?? `Booster: extra ${noun}`}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Buy extra {noun}</DialogTitle>
+            <DialogTitle>Booster pack: extra {noun}</DialogTitle>
             <DialogDescription>Only this feature needs credits: everything else, and all your saved leads, research and drafts, keeps working.</DialogDescription>
           </DialogHeader>
           <TopUpPacks kind={kind} onPurchased={() => setOpen(false)} />

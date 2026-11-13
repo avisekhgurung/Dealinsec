@@ -51,7 +51,7 @@ export default function TermsOfService() {
         <ul>
           <li><strong>Deal Management</strong> — Create and track client deals (free plan: 4 Deal Credits per month; 1 credit = 1 deal + its quotation).</li>
           <li><strong>Quotation Generation</strong> — Generate professional quotations (included with the deal's credit).</li>
-          <li><strong>Agreement Generation</strong> — Create professionally formatted agreement documents from your deal data (requires an active DealInSec Pro subscription). See Section 5 for what our electronic acceptance does and does not mean.</li>
+          <li><strong>Agreement Generation</strong> — Create professionally formatted agreement documents from your deal data, on every plan. See Section 5 for what our electronic acceptance does and does not mean.</li>
           <li><strong>Invoice Generation &amp; Payment Tracking</strong> — Generate professional invoices and track payments (included on every plan).</li>
         </ul>
 

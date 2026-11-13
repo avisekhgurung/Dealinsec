@@ -19,9 +19,10 @@ const sections = src["client/src/components/landing-redesign.tsx"];
 
 describe("homepage copy", () => {
   it("leads with the brand promise, says who it's for and what Free includes, with human approval beside the CTA", () => {
-    expect(sections).toContain("Your AI team<br />finds <span");
+    expect(sections).toContain("Find clients.<br />Win deals.<br />");
     expect(sections).toContain("For freelancers and service providers in India");
-    expect(sections).toContain("DealInSec gives Indian freelancers and service providers an AI team that researches potential clients, drafts the outreach and keeps every follow-up moving");
+    expect(sections).toContain("DealInSec finds potential clients for Indian freelancers, consultants and small agencies, with evidence behind every name, drafts the outreach you approve, and turns each won deal into a quotation, a signed agreement and an invoice");
+    expect(sections).toContain("deal to invoice is free on every plan");
     expect(sections).toContain('"Get started free"');
     expect(sections).toContain("See how it works");
     expect(sections).toContain("No credit card required");
@@ -30,7 +31,7 @@ describe("homepage copy", () => {
   });
 
   it("walks the real three-stage finding workflow, each stage naming its plan", () => {
-    for (const [stage, plan] of [["Describe who you want; AI researches", "Free"], ["Approve the first message and send it", "Free"], ["Track replies, next steps and follow-ups", "Free"]]) {
+    for (const [stage, plan] of [["Describe who you want; AI researches", "Free"], ["Approve the first message and send it", "Free"], ["Track replies, next steps and follow-ups", "Free"], ["Win the work: quotation, agreement, invoice", "Free"]]) {
       expect(sections, stage).toContain(`label: "${stage}", plan: "${plan}"`);
     }
   });
@@ -66,7 +67,7 @@ describe("homepage copy", () => {
   });
 
   it("labels example data and keeps inference apart from evidence", () => {
-    expect(sections).toContain("Real DealInSec screens (Client Radar and AI Team), with example data.");
+    expect(sections).toContain("Real DealInSec screen (Client Radar), with example data.");
     expect(sections).toContain("Demonstration with example data.");
     expect(sections).toContain("Possible opportunity · inference");
     expect(sections).toMatch(/\.example/); // example domains use the reserved TLD, so no real company is implied

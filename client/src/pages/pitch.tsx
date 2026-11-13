@@ -51,8 +51,8 @@ const PIPELINE = [
   { title: "Leads pipeline", text: "New → researching → qualified → contacted → replied → meeting → proposal → won or lost, with next steps, follow-up dates and a do-not-contact list.", plan: "Free" },
   { title: "Deals", text: "Retainer, fixed price, hourly, milestones and more, in your workspace's currency. Import existing deals from a CSV file.", plan: "Free, with no monthly cap" },
   { title: "Quotations", text: "Versioned, generated from the deal, with a link your client opens and accepts online. Protection Check flags missing terms first.", plan: "Free" },
-  { title: "Agreements", text: "Standard and custom terms; your client signs online through a link. Electronic acceptance with an audit record, not a certified digital signature.", plan: "Pro" },
-  { title: "Invoices and payment follow-ups", text: "Single or split into advance and final, never more than the agreement. Mark payments received; AI drafts a polite reminder you send yourself.", plan: "Pro" },
+  { title: "Agreements", text: "Standard and custom terms; your client signs online through a link. Electronic acceptance with an audit record, not a certified digital signature.", plan: "Free" },
+  { title: "Invoices and payment follow-ups", text: "Single or split into advance and final, never more than the agreement. Mark payments received; AI drafts a polite reminder you send yourself.", plan: "Free" },
   { title: "Today list and your AI team", text: "The dashboard shows what needs you today. Ask Nibo, Mika or Zee in plain words; they work through your records and ask before anything that matters.", plan: "Free" },
 ];
 

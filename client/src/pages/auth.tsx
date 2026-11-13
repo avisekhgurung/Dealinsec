@@ -36,13 +36,14 @@ const PIPELINE = [
   { icon: Users, label: "Lead" },
   { icon: Send, label: "Outreach" },
   { icon: MessagesSquare, label: "Reply" },
-  { icon: Handshake, label: "Client" },
+  { icon: Handshake, label: "Paid" },
 ];
 
 const PROOF_POINTS = [
   "Built for freelancers and service providers in India",
-  "You approve every message — nothing is sent automatically",
-  "Free plan, no credit card required. Pro when you need it",
+  "AI finds clients with evidence; you approve every message, nothing is sent automatically",
+  "Deal to invoice free on every plan: quotation, agreement, invoice, payment tracking",
+  "Free plan, no credit card required. Pro when you need more",
 ];
 
 /** Security facts, each one verifiable in the code — see the PRIVACY policy. */
@@ -140,11 +141,11 @@ export default function AuthPage() {
 
         <div className="relative mt-7">
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-300 mb-2">
-            Research · Outreach · Follow-up
+            Find · Win · Get paid
           </p>
           <h2 className="text-[1.6rem] leading-[1.2] font-bold tracking-tight">
-            Your AI team<br />
-            <span className="text-emerald-300">finds clients for you.</span>
+            Find clients.<br />
+            <span className="text-emerald-300">Win deals. Get paid.</span>
           </h2>
 
           <div className="flex items-center gap-1 mt-5">
@@ -201,7 +202,7 @@ export default function AuthPage() {
               </h1>
               <p className="text-sm text-muted-foreground mt-1.5 mb-6">
                 {mode === "signup"
-                  ? "Send your AI team to find your first clients. No credit card required."
+                  ? "Find clients with evidence, and run every won deal from quotation to invoice, free. No credit card required."
                   : "Log in and pick up where your AI team left off."}
               </p>
 
@@ -377,16 +378,17 @@ export default function AuthPage() {
 
         <div className="relative max-w-lg">
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-300 mb-4">
-            Research · Outreach · Follow-up
+            Find · Win · Get paid
           </p>
           <h2 className="text-[clamp(1.9rem,3.2vw,3.2rem)] font-bold text-white leading-[1.12] tracking-[-0.03em]">
-            Your AI team<br />
-            <span className="text-emerald-300">finds clients for you.</span>
+            Find clients.<br />
+            <span className="text-emerald-300">Win deals. Get paid.</span>
           </h2>
           <p className="text-emerald-100/70 mt-4 text-sm leading-relaxed">
             For freelancers, consultants and small agencies: your AI team researches
-            potential clients with evidence behind every name, drafts the outreach, and
-            keeps every follow-up moving — you approve every message before it goes.
+            potential clients with evidence behind every name and drafts the outreach you
+            approve. When you win the work, the quotation, the signed agreement, the invoice
+            and payment tracking are free on every plan.
           </p>
 
           <div className="flex items-center gap-1.5 xl:gap-2 mt-9">

@@ -64,7 +64,11 @@ import { openConsentSettings } from "@/lib/consent";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { BRAND_GRADIENT, GradientText, SectionHeader, fadeUp, onSectionLinkClick, scrollToSection, stagger } from "@/components/landing-shared";
 import { LandingTryDemo } from "@/components/landing-try-demo";
-import { AiTeamSection, AudienceCards, CtaBanner, FaqSection, FeaturesSection, HeroSection, ManualWorkflowSection, WorkflowWalkthrough } from "@/components/landing-redesign";
+import { AiTeamSection, AudienceCards, CtaBanner, DealSuiteSection, FaqSection, FeaturesSection, HeroSection, ManualWorkflowSection, WhatIsSection, WorkflowWalkthrough } from "@/components/landing-redesign";
+import { useQuery } from "@tanstack/react-query";
+import { PACKS_URL } from "@/lib/credit-keys";
+import { formatRupees } from "@/hooks/use-plan-prices";
+import type { Pack } from "@/components/credits/top-up";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LANDING_FAQS } from "@shared/landing-faqs";
 import { rememberAudienceIntent } from "@/lib/audience-intent";
@@ -114,7 +118,9 @@ const isServerRoute = (href: string) => SERVER_ROUTE_PREFIXES.some((p) => href.s
 type NavLink = { label: string; href: string; note?: string };
 const NAV_LINKS: (NavLink | { label: string; items: NavLink[] })[] = [
   { label: "Product", items: [
-    { label: "How it works", href: "#how", note: "From a search to a client conversation" },
+    { label: "What it is", href: "#what", note: "Find clients, win deals, get paid" },
+    { label: "How it works", href: "#how", note: "From a search to a paid invoice" },
+    { label: `${DEAL_SUITE_LABEL} (free)`, href: "#deal-suite", note: "Quotation, agreement, invoice, payment tracking" },
     { label: "Features", href: "#features", note: "Client Radar, outreach, leads and follow-ups" },
     { label: "Live demo", href: "#try", note: "Plan a search, read a reply, see what's next" },
     { label: "Who it's for", href: "#audiences", note: "Freelancers, consultants and small agencies" },
@@ -221,7 +227,7 @@ export default function LandingPage() {
   // + forgot-password flow) — the popup stays only as dead markup until a
   // future cleanup pass.
   // Which call to action a visitor used (the hero has its own event, hero_cta_click). A fixed location id only.
-  const landingCta = (location: "pricing" | "final_banner" | "ask_dealinsec") => trackEvent("landing_cta_click", { location, signed_in: isAuthenticated });
+  const landingCta = (location: "pricing" | "final_banner" | "ask_dealinsec" | "deal_suite") => trackEvent("landing_cta_click", { location, signed_in: isAuthenticated });
   const openAuth = (tab: "signup" | "login") => {
     setLocation(tab === "login" ? "/auth?mode=signin" : "/auth?mode=signup");
   };
@@ -286,13 +292,15 @@ export default function LandingPage() {
 
       <main className="relative z-[1]">
         <HeroSection isAuthenticated={isAuthenticated} onPrimary={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))} />
-        <AiTeamSection />
+        <WhatIsSection />
         <WorkflowWalkthrough />
+        <AiTeamSection />
         <FeaturesSection />
+        <DealSuiteSection isAuthenticated={isAuthenticated} onPrimary={() => { landingCta("deal_suite"); isAuthenticated ? setLocation("/deals/new") : openAuth("signup"); }} />
         <ManualWorkflowSection />
         <AudienceCards />
         {!isAuthenticated && <LandingTryDemo />}
-        <PricingPreview onCTA={() => { landingCta("pricing"); isAuthenticated ? setLocation("/pricing") : openAuth("signup"); }} />
+        <PricingPreview isAuthenticated={isAuthenticated} onCTA={() => { landingCta("pricing"); isAuthenticated ? setLocation("/pricing") : openAuth("signup"); }} />
         <CtaBanner isAuthenticated={isAuthenticated} onPrimary={() => { landingCta("final_banner"); isAuthenticated ? setLocation("/dashboard") : openAuth("signup"); }} />
         <FaqSection />
       </main>
@@ -689,7 +697,68 @@ function NavMenu({ label, items }: { label: string; items: NavLink[] }) {
   );
 }
 
-function PricingPreview({ onCTA }: { onCTA: () => void }) {
+/**
+ * The booster packs on sale, read from the server (GET /api/credits/packs is public: it is a price list, nothing about
+ * anyone's workspace). Nothing here knows a pack size, a price or how long credits last; when the list can't be read the
+ * card still says what boosters are for and where to buy them.
+ */
+function BoosterPacksCard({ isAuthenticated, onCTA }: { isAuthenticated: boolean; onCTA: () => void }) {
+  const { data, isError } = useQuery<{ packs: Pack[] }>({ queryKey: [PACKS_URL], staleTime: 10 * 60 * 1000, retry: false });
+  const packs = data?.packs ?? [];
+  const byKind = (k: Pack["kind"]) => packs.filter((p) => p.kind === k);
+  const kinds: { kind: Pack["kind"]; label: string }[] = [{ kind: "search", label: "Client Radar searches" }, { kind: "draft", label: "AI outreach drafts" }];
+  return (
+    <motion.div variants={fadeUp} className="relative rounded-2xl border border-amber-200 bg-white p-7 dark:border-amber-900/60 dark:bg-neutral-900/50" data-testid="pricing-boosters">
+      <div className="flex items-center gap-2 mb-1">
+        <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center">
+          <Zap className="w-4 h-4 text-amber-600" />
+        </div>
+        <p className="text-sm font-semibold">Booster packs</p>
+      </div>
+      <div className="mt-4 flex items-baseline gap-1">
+        <span className="text-4xl font-bold tracking-tight">{packs.length ? `from ${formatRupees(Math.min(...packs.map((p) => p.priceRupees)))}` : "One-time"}</span>
+        <span className="text-sm text-neutral-500">/ pack</span>
+      </div>
+      <p className="text-xs text-neutral-500 mt-1">Ran out before the month did? Add searches or drafts without changing your plan. Used only after your plan's own allowance; never renews.</p>
+      {packs.length > 0 ? (
+        <div className="mt-5 space-y-3">
+          {kinds.map(({ kind, label }) => byKind(kind).length > 0 && (
+            <div key={kind}>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">{label}</p>
+              <ul className="mt-1 space-y-1">
+                {byKind(kind).map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+                    <span className="inline-flex items-center gap-2"><Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />{p.units} {kind === "search" ? "searches" : "drafts"}</span>
+                    <span className="font-semibold tabular-nums">{formatRupees(p.priceRupees)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          <p className="text-[11px] text-neutral-500">{packs[0].expiry}</p>
+        </div>
+      ) : (
+        <ul className="mt-5 space-y-2.5">
+          {[
+            "Extra Client Radar searches or AI outreach drafts, in small packs",
+            isError ? "Pack sizes and prices are listed in the app under Credits & usage" : "Loading the packs on sale…",
+            "Spent only after your plan's allowance, and they stay yours if the plan ends",
+          ].map((t) => (
+            <li key={t} className="flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300"><Check className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" /><span>{t}</span></li>
+          ))}
+        </ul>
+      )}
+      {isAuthenticated ? (
+        <Link href="/wallet" className="mt-6 flex h-10 w-full items-center justify-center rounded-md bg-neutral-100 text-sm font-semibold text-neutral-900 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-white dark:hover:bg-neutral-700" data-testid="button-boosters-wallet">Open Credits &amp; usage</Link>
+      ) : (
+        <Button onClick={onCTA} className="w-full mt-6 h-10 text-sm font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700" data-testid="button-boosters-signup">Start free, add a booster later</Button>
+      )}
+      <p className="text-[11px] text-neutral-500 text-center mt-3">Bought in the app, in rupees, by workspaces in India. They add capacity; they don't unlock anything.</p>
+    </motion.div>
+  );
+}
+
+function PricingPreview({ isAuthenticated, onCTA }: { isAuthenticated: boolean; onCTA: () => void }) {
   const free = OUTBOUND_ALLOWANCE_DEFAULTS.free, pro = OUTBOUND_ALLOWANCE_DEFAULTS.pro;
   const freePerks = [
     `AI client research: ${free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${free.maxCompanies} companies each`,
@@ -713,8 +782,8 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader
           eyebrow="Pricing"
-          title="Start free. Upgrade when you need more."
-          subtitle="Find and research clients for free. Upgrade when you need more searches, drafts and coworker tasks."
+          title="Start free. Upgrade when you need more. Boost when you run out."
+          subtitle={`Find and research clients for free; the ${DEAL_SUITE_LABEL} is free on every plan. Pro buys more searches, drafts and coworker tasks, and a booster pack covers a month that runs short.`}
         />
 
         <motion.div
@@ -722,7 +791,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-80px" }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-8 max-w-4xl mx-auto"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mt-8 max-w-6xl mx-auto items-start"
         >
           {/* Free tier */}
           <motion.div
@@ -820,6 +889,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
 
+              <p className="mt-3 text-[11px] text-neutral-500">Used your Pro searches early? They free up as earlier ones pass {OUTBOUND_WINDOW_DAYS} days, or a booster pack covers the next ones now.</p>
               {/* Trust signals row */}
               <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 mt-3 text-[10px] text-neutral-500">
                 <span className="inline-flex items-center gap-1">
@@ -835,6 +905,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
             </div>
           </motion.div>
 
+          <BoosterPacksCard isAuthenticated={isAuthenticated} onCTA={onCTA} />
         </motion.div>
 
         {/* Honest currency note: only Indian workspaces can buy Pro today. */}
@@ -851,12 +922,14 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
           className="mt-10 max-w-4xl mx-auto rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-5 sm:p-6"
           data-testid="pricing-limits"
         >
-          <p className="text-sm font-bold">How AI search limits work</p>
+          <p className="text-sm font-bold">How the limits and boosters work</p>
           <ul className="mt-3 grid gap-x-6 gap-y-2 text-sm text-neutral-600 dark:text-neutral-400 sm:grid-cols-2">
             {[
               `One credit is one search that ran on the web. A search that stopped before searching isn't counted.`,
               `Counted over a rolling ${OUTBOUND_WINDOW_DAYS} days, with at most 5 searches a day.`,
-              `At the limit on Free, upgrade to Pro or wait; on Pro, searches free up as earlier ones pass ${OUTBOUND_WINDOW_DAYS} days.`,
+              `At the limit on Free, upgrade to Pro, buy a booster pack or wait; on Pro, searches free up as earlier ones pass ${OUTBOUND_WINDOW_DAYS} days, or a booster covers the next ones.`,
+              "Only searching or drafting pauses: your leads, replies and the whole deal-to-invoice flow keep working.",
+              "Booster credits are spent after your plan's own allowance, never renew, and stay yours if the plan ends.",
               "Nothing is unlimited, and what you already found stays in your workspace.",
             ].map((t) => (
               <li key={t} className="flex items-start gap-2"><Check className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" /><span>{t}</span></li>
@@ -871,7 +944,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
 /** The slim footer: the logo with its slogan, the main links, socials; then a quieter row of every page worth finding. */
 function Footer() {
   const main = [
-    { label: "Product", href: "#features" }, { label: "AI team", href: "#ai-team" }, { label: "Pricing", href: "#pricing" }, { label: "Blog", href: "/blog" },
+    { label: "Product", href: "#what" }, { label: "AI team", href: "#ai-team" }, { label: DEAL_SUITE_LABEL, href: "#deal-suite" }, { label: "Pricing", href: "#pricing" }, { label: "Blog", href: "/blog" },
     { label: "Support", href: "mailto:support@dealinsec.com" }, { label: "Privacy", href: "/privacy" }, { label: "Terms", href: "/terms" },
   ];
   const more = [

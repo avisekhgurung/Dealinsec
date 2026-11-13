@@ -717,7 +717,7 @@ ${ctaInline("Need the real thing?", "Make a genuine, professional quotation in f
   <li><b>Your identity on the documents</b> — your name, logo and PAN/GSTIN on the papers a client keeps, not the vendor's branding.</li>
 </ul>
 
-${ctaInline("See it on one real deal", "Create a deal and generate the quotation on the free plan, no card; Pro (₹299/month in India) turns it into an agreement and invoices.", SIGNUP, "Try DealInSec free →")}
+${ctaInline("See it on one real deal", "Create the deal, the quotation, the agreement your client signs online and the invoices on the free plan, with no monthly cap and no card.", SIGNUP, "Try DealInSec free →")}
 
 <h2>Who actually needs it</h2>
 <p>Freelancers — designers, developers, writers, video editors and photographers, marketers and consultants — anyone who quotes, signs and bills their own clients, so the work follows the quote → agree → deliver → bill arc. If you sell products off a shelf, you need billing/inventory software instead; if your problem is finding clients rather than papering them, you need a CRM first. DealInSec's stack covers the deal side: <a href="/quotation-software">quotation software</a>, <a href="/contract-management">contract management</a>, <a href="/invoice-management">invoice management</a> and <a href="/e-signature">e-signature</a> on one thread. To see how that differs from all-in-one tools with time tracking and accounting, read <a href="/freelance-business-management-software">what freelance business management software covers</a>; to try the first step without an account, use the free <a href="/tools/quotation-maker">quotation maker</a>.</p>

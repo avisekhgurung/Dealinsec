@@ -641,7 +641,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "What happens after acceptance?",
-        a: "On Pro (₹299/month), the accepted proposal becomes an agreement with the same figures, accepted electronically with an audit record, and then invoices — an advance/balance split or milestones — bounded by the agreement's value.",
+        a: "On every plan, free: the accepted proposal becomes an agreement with the same figures, accepted electronically with an audit record, and then invoices — an advance/balance split or milestones — bounded by the agreement's value. Pro (₹299/month) only adds more AI client research and drafts.",
       },
     ],
   },
@@ -712,7 +712,7 @@ export const PAGES: CategoryPage[] = [
     <div class="ft"><b>Execution record on the face</b><p>The agreement prints who accepted it, when, and with which signature — plus your signature image and stamp where you've set them.</p></div>
     <div class="ft"><b>Client-friendly</b><p>Your client accepts electronically through a confirmation flow — the signed copy stays on record, and the printed document reflects the acceptance.</p></div>
     <div class="ft"><b>Signature binding</b><p>The signature captured at creation stays with the document — it doesn't change when someone else views or reprints it.</p></div>
-    <div class="ft"><b>Priced for a freelancer</b><p>E-sign is part of Pro — ₹299/month — rather than a separate per-envelope bill in dollars.</p></div>
+    <div class="ft"><b>Priced for a freelancer</b><p>E-sign is free on every plan, with no per-envelope bill in dollars; Pro (₹299/month) buys more AI client research, not signing.</p></div>
   </div>
   <div class="callout honest"><b>What this is — and isn't</b><p>Electronic contracts are recognised in India under Section 10A of the Information Technology Act, 2000, and DealInSec records electronic acceptance with an audit record. It is <b>not</b> a Digital Signature Certificate (DSC) or an Aadhaar eSign, and every agreement says so on its face. If a client or regulator specifically requires DSC/Aadhaar eSign, use those; for an everyday freelance scope, an accepted document with a clear audit record is the practical option. We are not a law firm — have important agreements reviewed by a lawyer.</p></div>
 </div></section>`,
@@ -846,7 +846,7 @@ export const PAGES: CategoryPage[] = [
     <div class="ft"><b>A lead pipeline</b><p>Save each potential client as a lead and move it through stages: new, researching, qualified, contacted, replied, meeting, proposal, then won or lost. Each lead keeps its next step, a follow-up date, notes and the facts you found, with their sources.</p></div>
     <div class="ft"><b>Deals for the work you win</b><p>A won lead becomes a deal in one step. The deal records the client, the engagement model (fixed price, retainer, hourly, milestones and more), the service, the value and the dates. You can also import existing deals from a CSV file.</p></div>
     <div class="ft"><b>What needs you today</b><p>The dashboard lists follow-ups due, quotations your client hasn't accepted yet, agreements waiting for a signature, work ready to invoice and invoices that are overdue, built from your own records.</p></div>
-    <div class="ft"><b>Documents from the same deal</b><p>Send a quotation your client can open and accept online. On Pro, create the agreement your client signs online and the invoices, with the same figures, and record payments as they arrive.</p></div>
+    <div class="ft"><b>Documents from the same deal</b><p>Send a quotation your client can open and accept online, create the agreement your client signs online and the invoices, with the same figures, and record payments as they arrive. All free, on every plan.</p></div>
     <div class="ft"><b>Find new clients</b><p>Client Radar researches companies that fit what you sell, or lists local businesses in a city from Google Maps, with sources for what it finds. The free plan includes ${OB.free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days.</p></div>
     <div class="ft"><b>Do-not-contact, respected</b><p>Add an email address or a whole domain once and DealInSec won't draft or approve messages to it.</p></div>
   </div>
@@ -859,7 +859,7 @@ export const PAGES: CategoryPage[] = [
     <tr><td><b>Follow-ups</b></td><td>Whatever you remember</td><td>A follow-up date and next step on every lead, listed when due</td></tr>
     <tr><td><b>Quotation</b></td><td>A separate document, typed again</td><td>Generated from the deal; your client accepts it online</td></tr>
     <tr><td><b>Agreement and invoice</b></td><td>More documents, more re-typing</td><td>From the same deal, with the same figures (Pro)</td></tr>
-    <tr><td><b>What's unpaid</b></td><td>Checked in your bank app</td><td>Paid, pending and overdue invoices at a glance (Pro)</td></tr>
+    <tr><td><b>What's unpaid</b></td><td>Checked in your bank app</td><td>Paid, pending and overdue invoices at a glance (free, every plan)</td></tr>
   </table></div>
 </div></section>
 <section><div class="wrap">
