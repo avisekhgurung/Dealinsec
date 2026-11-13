@@ -26,8 +26,8 @@ import { allOf, needsPermission, needsRead } from "../policy";
 import type { AgentTool, ToolContext, ToolOutcome } from "../types";
 import { dateLabel, fail, money, safeName, settingsFor } from "./shared";
 
-const canWrite = needsPermission("deals.create", "changing leads");
-const readLeads = needsRead("deals");
+const canWrite = needsPermission("leads.manage", "changing leads");
+const readLeads = needsRead("finding");
 const who = (ctx: ToolContext) => ctx.user as any;
 const stageLabel = (s: string) => leadStatusLabels[s as LeadStatus] ?? s;
 const route = (id: number) => `/leads/${id}`;
@@ -422,7 +422,7 @@ const convertTool: AgentTool<z.infer<typeof convertInput>> = {
   description: `Close a lead as WON by creating its deal. The only way a lead becomes won. The lead must be at least Qualified (${CONVERTIBLE_FROM.map(stageLabel).join(", ")}). Needs a deal amount: the user's, or the lead's estimated value. It always asks the user first and shows the deal and its Protection Check.`,
   risk: "CONSEQUENTIAL_MUTATION",
   input: convertInput,
-  authorize: allOf(canWrite, readLeads),
+  authorize: allOf(canWrite, needsPermission("deals.create", "creating deals"), readLeads),
   async prepare(ctx, input) {
     const { leadId, ...rest } = input;
     const p = await previewConversion(who(ctx), leadId, rest);

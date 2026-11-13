@@ -35,13 +35,13 @@ export const firstIssue = (e: z.ZodError) => e.issues[0]?.message ?? "That isn't
 /** Reading leads follows the Deals module: whoever may read deals may read their pipeline. */
 export function readGate(user: Who): Fail | null {
   if (!user.organizationId) return fail(403, "no_organization", "Finish setting up your workspace first.");
-  if (!canReadModule(user as any, "deals")) return fail(403, "forbidden", "Your role doesn't include viewing leads.");
+  if (!canReadModule(user as any, "finding")) return fail(403, "forbidden", "Your role doesn't include viewing leads.");
   return null;
 }
 export function writeGate(user: Who): Fail | null {
   const r = readGate(user);
   if (r) return r;
-  if (!memberCan(user as any, "deals.create")) return fail(403, "forbidden", "Your role doesn't allow changing leads. Ask your organization owner.");
+  if (!memberCan(user as any, "leads.manage")) return fail(403, "forbidden", "Your role doesn't allow changing leads. Ask your organization owner.");
   return null;
 }
 

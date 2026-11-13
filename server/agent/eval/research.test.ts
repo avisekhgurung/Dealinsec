@@ -338,12 +338,12 @@ describe("starting a run", () => {
     const theirs = seedLead(world(), { companyName: "Theirs", website: "https://casaalma.pt", domain: "theirs.pt" }, ORG2);
     expect((await start(theirs.id, OTHER())).r.ok).toBe(true);
   });
-  it("another workspace's lead is not found, for starting and for reading; a member who may only edit deals can read but not start", async () => {
+  it("another workspace's lead is not found, for starting and for reading; a member who may only use the AI Team can read but not start", async () => {
     stdSite(); say([]);
     const mine = lead();
     expect((await start(mine.id, OTHER())).r).toMatchObject({ ok: false, code: "not_found" });
     expect(await getResearch(OTHER(), mine.id)).toMatchObject({ ok: false, code: "not_found" });
-    const reader = { ...user(), orgRole: "CUSTOM", customPermissions: ["deals.edit"] };
+    const reader = { ...user(), orgRole: "CUSTOM", customPermissions: ["ai.tasks"] };
     expect((await start(mine.id, reader)).r).toMatchObject({ ok: false, code: "forbidden" });
     expect((await getResearch(reader, mine.id)).ok).toBe(true);
     const nobody = { ...user(), orgRole: "CUSTOM", customPermissions: [] };

@@ -835,7 +835,7 @@ export class DatabaseStorage implements IStorage {
     const [org] = await db.insert(organizations).values({ name, slug }).returning();
     // Default roles are ordinary editable rows from day one (single choke
     // point — every org-creation path passes through here).
-    await this.seedDefaultRoles(org.id);
+    // Roles are not seeded (13 Nov 2026): the owner creates each one with the permissions it needs.
     return org;
   }
 

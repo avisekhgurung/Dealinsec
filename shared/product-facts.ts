@@ -118,7 +118,7 @@ export const CAPABILITIES: readonly Capability[] = [
   },
   {
     key: "gmail", name: "Gmail connection", status: "limited",
-    text: "Connecting a Gmail account is in limited early access for selected workspaces while Google's verification is completed, so it isn't available to everyone yet. Where it is switched on, replies to your outreach can be synced into an inbox and sorted by fixed rules (interested, not interested, opt-out, bounce and so on), never by AI: DealInSec never sends Gmail content to an AI model. A reply, opt-out or bounce stops pending follow-ups, and an interested reply can become a deal after you review it.",
+    text: "Connecting Gmail, or a Google Workspace business address such as you@yourcompany.com, is in limited early access for selected workspaces while Google's verification is completed, so it isn't available to everyone yet. Where it is switched on, replies to your outreach can be synced into an inbox and sorted by fixed rules (interested, not interested, opt-out, bounce and so on), never by AI: DealInSec never sends Gmail content to an AI model. A reply, opt-out or bounce stops pending follow-ups, and an interested reply can become a deal after you review it.",
   },
   {
     key: "auto_send", name: "Sending email automatically", status: "not_available",

@@ -119,10 +119,18 @@ describe("mobile bar and More sheet", () => {
     expect(moreSheetSections(u).map((x) => keys(x.items))).toEqual([["invoices"], ["profile", "settings"]]);
   });
 
-  it("deal permissions keep the finding bar, and add only what that role may see to the sheet", () => {
+  it("deal permissions alone keep Home and the paperwork, not the finding bar", () => {
     const u = custom("deals.create");
-    expect(keys(mobileBarItems(u))).toEqual(["home", "outbound", "league", "leads"]);
+    expect(keys(mobileBarItems(u))).toEqual(["home"]);
     expect(moreSheetSections(u).map((x) => keys(x.items))).toEqual([["deals"], ["quotations"], ["profile", "settings"]]);
+  });
+
+  it("any client-finding permission keeps the finding bar, and the sheet holds only the account", () => {
+    for (const p of ["radar.search", "leads.manage", "outreach.send", "ai.tasks"] as const) {
+      const u = custom(p);
+      expect(keys(mobileBarItems(u)), p).toEqual(["home", "outbound", "league", "leads"]);
+      expect(moreSheetSections(u).map((x) => keys(x.items)), p).toEqual([["profile", "settings"]]);
+    }
   });
 
   it("Settings and Profile are always reachable", () => {

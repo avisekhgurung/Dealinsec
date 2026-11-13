@@ -240,9 +240,9 @@ describe("removing, limits and roles", () => {
     world().knowledge.sources.push({ id: "x", organizationId: ORG1, sha256: "x", kind: "note", title: "X", chunkCount: 4000, createdAt: new Date() });
     expect(out(await addNote(user(), NOTE))).toMatch(/knowledge is full/);
   });
-  it("a member who can read deals but not create them can list and search, but not add or remove; list shows only their workspace", async () => {
+  it("a member who may use the AI Team but not change leads can list and search, but not add or remove; list shows only their workspace", async () => {
     const added = await addNote(user(), NOTE); await addNote(OTHER(), { title: "Theirs", text: "Another business with its own private notes here." });
-    const reader = { ...user(), orgRole: "CUSTOM", customPermissions: ["deals.edit"] } as any;
+    const reader = { ...user(), orgRole: "CUSTOM", customPermissions: ["ai.tasks"] } as any;
     const l = await listKnowledge(reader);
     expect(l.ok && l.sources.map((s) => s.title)).toEqual(["Who we help"]);
     expect((await searchKnowledge(reader, "hotels Portugal")).ok).toBe(true);

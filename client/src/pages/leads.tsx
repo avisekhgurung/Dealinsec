@@ -129,7 +129,7 @@ export default function LeadsPage() {
   const { user } = useAuth();
   const { locale } = useMoney();
   const calm = useCalmMotion();
-  const canEdit = memberCan(user as any, "deals.create");
+  const canEdit = memberCan(user as any, "leads.manage");
   const [status, setStatus] = useState<string>("");
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);

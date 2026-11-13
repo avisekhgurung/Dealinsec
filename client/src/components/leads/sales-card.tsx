@@ -39,7 +39,7 @@ const path = (u: string) => { try { const x = new URL(u); return x.hostname.repl
 function ResearchPanel({ leadId, hasWebsite }: { leadId: number; hasWebsite: boolean }) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const canRun = memberCan(user as any, "deals.create");
+  const canRun = memberCan(user as any, "outreach.send");
   const q = useQuery<{ research: ResearchView | null }>({
     queryKey: [researchUrl(leadId)], retry: false,
     refetchInterval: (query) => (query.state.data?.research?.status === "running" ? 2500 : false),

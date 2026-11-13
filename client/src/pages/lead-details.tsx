@@ -82,7 +82,7 @@ export default function LeadDetailsPage() {
   const { toast } = useToast();
   const confirm = useConfirm();
   const calm = useCalmMotion();
-  const canEdit = memberCan(user as any, "deals.create");
+  const canEdit = memberCan(user as any, "leads.manage");
 
   const { data, isLoading, error, isError, refetch, isFetching } = useQuery<LeadDetailView>({ queryKey: [detailUrl(id)], enabled: !!id });
   const lead = data?.lead;

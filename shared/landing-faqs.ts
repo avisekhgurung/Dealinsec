@@ -49,7 +49,7 @@ export const LANDING_FAQS: LandingFaq[] = [
   },
   {
     q: "Does DealInSec work with Gmail?",
-    a: "Connecting Gmail is in limited early access for selected workspaces while Google's verification is completed, so it isn't available to everyone yet. Where it is switched on, a reply to your outreach is matched to the lead and shown on its record, the lead moves to Replied, its pending follow-ups stop, and your Today list shows how many leads have replied. Replies are sorted by fixed rules (interested, not interested, opt-out, bounce) and are never read by AI: DealInSec never sends Gmail content to an AI model.",
+    a: "Connecting Gmail, or a Google Workspace business address such as you@yourcompany.com, is in limited early access for selected workspaces while Google's verification is completed, so it isn't available to everyone yet. Where it is switched on, a reply to your outreach is matched to the lead and shown on its record, the lead moves to Replied, its pending follow-ups stop, and your Today list shows how many leads have replied. Replies are sorted by fixed rules (interested, not interested, opt-out, bounce) and are never read by AI: DealInSec never sends Gmail content to an AI model.",
   },
   {
     q: "Is the deal-to-invoice flow really free?",

@@ -22,8 +22,9 @@ import { needsPermission, needsRead } from "../policy";
 import type { AgentTool, ToolContext, ToolOutcome } from "../types";
 import { fail, safeName } from "./shared";
 
-const canWrite = needsPermission("deals.create", "changing leads");
-const readLeads = needsRead("deals");
+const canWrite = needsPermission("radar.search", "running Client Radar");
+const canAddLead = needsPermission("leads.manage", "changing leads");
+const readLeads = needsRead("finding");
 const who = (ctx: ToolContext) => ctx.user as any;
 const failFrom = (r: { code: string; message: string }): Extract<ToolOutcome, { ok: false }> => fail(r.code, r.message);
 const link = "/outbound";
@@ -207,7 +208,7 @@ const addTool: AgentTool<{ prospectId: number; contactFindingId?: number }> = {
   name: "add_prospect_to_leads",
   description: "Add a prospect to the user's Leads, with its evidence copied to the lead's facts. Do it only when the user asks to add that company. The lead's contact email is set only if the user names a person from get_prospect_intelligence AND the provider verified that email; never put an email you were not given.",
   risk: "SAFE_MUTATION", input: z.object({ prospectId: z.number().int().positive(), contactFindingId: z.number().int().positive().optional().describe("The [F id] of the person to use as the contact, only if the user chose one") }),
-  authorize: canWrite,
+  authorize: canAddLead,
   async prepare(ctx, { prospectId, contactFindingId }) {
     const r = await getProspect(who(ctx), prospectId);
     if (!r.ok) return { ok: false, code: r.code, message: r.message };

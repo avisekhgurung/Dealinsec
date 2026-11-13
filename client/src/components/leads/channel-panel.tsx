@@ -72,7 +72,7 @@ export function ChannelPanel({ leadId, companyName, contactName }: { leadId: num
 function ChannelComposer({ leadId, channel, status, search }: { leadId: number; channel: ShortChannel; status: ChannelStatus | null; search: string }) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const canRun = memberCan(user as any, "deals.create");
+  const canRun = memberCan(user as any, "outreach.send");
   const q = useChannelMessages(leadId);
   const msgs = (q.data?.messages ?? []).filter((m) => m.channel === channel);
   const current = msgs.find((m) => m.direction === "out" && UNSENT.includes(m.status)) ?? null;

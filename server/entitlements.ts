@@ -57,7 +57,7 @@ export function requireOrgPermission(permission: Permission): RequestHandler {
 /** Gate a READ route to members whose role may see that module. Hiding nav was
  *  never authorisation — without this an invoices-only member could GET
  *  /api/deals and read the whole pipeline. See MODULE_READ. */
-export function requireModuleRead(moduleKey: "deals" | "quotations" | "agreements" | "invoices"): RequestHandler {
+export function requireModuleRead(moduleKey: "finding" | "deals" | "quotations" | "agreements" | "invoices"): RequestHandler {
   return (req: any, res, next) => {
     if (canReadModule(req.user, moduleKey)) return next();
     return res.status(403).json({

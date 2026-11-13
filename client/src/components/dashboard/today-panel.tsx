@@ -151,7 +151,7 @@ export function TodayPanel({ hideWhenEmpty = false }: { hideWhenEmpty?: boolean 
   const calm = useCalmMotion();
   const [expanded, setExpanded] = useState(false);
 
-  const seeDeals = canSeeModule(user as any, "deals");
+  const seeDeals = canSeeModule(user as any, "finding");
   const invoices = useQuery<BrandInvoice[]>({ queryKey: ["/api/brand-invoices"] });
   const contracts = useQuery<Contract[]>({ queryKey: ["/api/contracts"] });
   const quotes = useQuery<(Quote & { deal: Deal | null })[]>({ queryKey: ["/api/quotes"] });

@@ -94,7 +94,7 @@ describe("what the agent can never do", () => {
   });
   it("a role that cannot change leads can use none of the sales tools that write, and a role that cannot read can use none", () => {
     const nobody = userRow({ orgRole: "CUSTOM", customPermissions: [] });
-    const viewer = userRow({ orgRole: "CUSTOM", customPermissions: ["deals.edit"] });
+    const viewer = userRow({ orgRole: "CUSTOM", customPermissions: ["ai.tasks"] });
     for (const n of ["get_lead_score", "get_outreach_draft", "research_lead", "draft_outreach", "approve_outreach", "mark_outreach_sent"]) {
       expect(authorizeCall(AGENT_TOOLS.find((t) => t.name === n)!, nobody, {} as any), n).not.toBeNull();
     }

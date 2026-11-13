@@ -34,7 +34,7 @@ const user = (over: Record<string, any> = {}) => userRow(over) as any;
 const OTHER = () => userRow({ id: "u2", organizationId: ORG2 }) as any;
 const nobody = () => ({ ...user(), orgRole: "CUSTOM", customPermissions: [] });
 /** Can see the pipeline but not change it. */
-const viewer = () => ({ ...user(), orgRole: "CUSTOM", customPermissions: ["deals.edit"] });
+const viewer = () => ({ ...user(), orgRole: "CUSTOM", customPermissions: ["ai.tasks"] });
 
 const SUBJECT = "A quick note about Casa Alma Porto";
 const BODY = "Hello,\n\nI saw that Casa Alma runs boutique hotels in Lisbon and has just opened a second hotel in Porto. Congratulations. I help small hotel groups keep their client paperwork tidy, and I wondered whether that is something you are thinking about as you grow.\n\nWould a short reply or a quick chat be useful?\n\nBest,\nAsha Rao";

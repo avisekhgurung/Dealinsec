@@ -21,6 +21,11 @@ export const orgRoleOptions = ["OWNER", "ADMIN", "SALES", "ACCOUNTS"] as const;
 export type OrgRole = (typeof orgRoleOptions)[number];
 
 export type Permission =
+  // Client finding (13 Nov 2026): the product's own half, gated on its own instead of on deals.create.
+  | "radar.search"     // run Client Radar searches, local and social scans; save client profiles
+  | "leads.manage"     // add and edit leads, follow-ups, the ideal-client profile
+  | "outreach.send"    // draft, approve and send outreach; campaigns, channels, connect a mailbox
+  | "ai.tasks"         // start AI Team tasks and chats
   | "deals.create"
   | "deals.edit"
   | "quotations.create"
@@ -39,7 +44,11 @@ export type Permission =
 // NOTE: clients.manage is deliberately absent — no route checks it (clients
 // are a field on deals, not a module). Kept in the type union only so any
 // stored occurrence stays parseable.
+/** The four client-finding permissions, in the order the matrix shows them. */
+export const FINDING_PERMISSIONS: Permission[] = ["radar.search", "leads.manage", "outreach.send", "ai.tasks"];
+
 const ALL: Permission[] = [
+  ...FINDING_PERMISSIONS,
   "deals.create", "deals.edit", "quotations.create",
   "agreements.create", "invoices.create", "invoices.delete", "payments.manage",
   "team.invite", "team.manage", "org.settings", "org.delete",
@@ -49,11 +58,13 @@ const ALL: Permission[] = [
 export const ROLE_PERMISSIONS: Record<OrgRole, Permission[]> = {
   OWNER: ALL,
   ADMIN: [
+    ...FINDING_PERMISSIONS,
     "deals.create", "deals.edit", "quotations.create",
     "agreements.create", "invoices.create", "invoices.delete", "payments.manage",
     "team.invite", "team.manage", "org.settings", "activity.view",
   ],
   SALES: [
+    ...FINDING_PERMISSIONS,
     "deals.create", "deals.edit", "quotations.create",
   ],
   ACCOUNTS: [
@@ -103,6 +114,8 @@ export function memberCan(
 // full nav (their scope is broad by definition). Reads stay allowed
 // server-side either way — this is navigation, not authorisation.
 export const MODULE_PERMISSIONS: Record<string, Permission[]> = {
+  // Client Radar, Leads and the AI Team: any finding permission shows them.
+  finding: FINDING_PERMISSIONS,
   deals: ["deals.create", "deals.edit"],
   quotations: ["quotations.create", "deals.create", "deals.edit"],
   agreements: ["agreements.create"],
@@ -122,6 +135,8 @@ export const MODULE_PERMISSIONS: Record<string, Permission[]> = {
  * Anything NOT listed is denied. Keep it that way.
  */
 export const MODULE_READ: Record<string, Permission[]> = {
+  // Prospects, leads, outreach and coworker runs: every finding permission needs to read them.
+  finding: FINDING_PERMISSIONS,
   // Quoting and agreement work both start from a deal.
   deals: ["deals.create", "deals.edit", "quotations.create", "agreements.create"],
   quotations: ["quotations.create", "deals.create", "deals.edit"],
@@ -170,6 +185,12 @@ export const PERMISSION_MATRIX: {
   module: string;
   items: { perm: Permission; label: string }[];
 }[] = [
+  { module: "Client finding", items: [
+    { perm: "radar.search", label: "Run searches" },
+    { perm: "leads.manage", label: "Manage leads" },
+    { perm: "outreach.send", label: "Outreach" },
+    { perm: "ai.tasks", label: "AI Team" },
+  ]},
   { module: "Deals", items: [
     { perm: "deals.create", label: "Create" },
     { perm: "deals.edit", label: "Edit" },
@@ -197,12 +218,13 @@ export const PERMISSION_MATRIX: {
   ]},
 ];
 
-// ── Default role seeds ─────────────────────────────────────────────────
-// Admin/Sales/Accounts are seeded into org_roles as ORDINARY editable,
-// deletable rows (new orgs at creation; existing orgs lazily, once, via
-// organizations.roles_seeded). Full flexibility — the owner can reshape or
-// remove them. OWNER stays code-level: an org must always have exactly one
-// root authority that holds billing.
+// ── Former default role seeds ─────────────────────────────────────────
+// Until 13 Nov 2026 Admin/Sales/Accounts were seeded into org_roles for every
+// workspace. Nothing seeds them any more: a workspace starts with no roles and
+// the owner creates each one with exactly the permissions it needs (the invite
+// dialog can do it inline). The list stays only so script/migrate-finding-
+// permissions.ts can recognise and remove unused seeded rows. OWNER stays
+// code-level: an org must always have exactly one root authority that holds billing.
 export const DEFAULT_ROLE_SEEDS: { name: string; permissions: Permission[] }[] = [
   { name: "Admin",    permissions: ROLE_PERMISSIONS.ADMIN.filter((p) => ASSIGNABLE_PERMISSIONS.includes(p)) },
   { name: "Sales",    permissions: ROLE_PERMISSIONS.SALES.filter((p) => ASSIGNABLE_PERMISSIONS.includes(p)) },

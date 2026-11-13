@@ -19,7 +19,7 @@ const getIdealClientTool: AgentTool<Record<string, never>> = {
   description: "What the user is looking for in a client: what they sell, target industries and locations, minimum deal size, and what they exclude. Read this before judging whether a lead or company is a good target. Empty fields mean the user has not said, not that anything is fine.",
   risk: "READ_ONLY", activity: "searching",
   input: z.object({}),
-  authorize: needsRead("deals"),
+  authorize: needsRead("finding"),
   async run(ctx): Promise<ToolOutcome> {
     const r = await getIdealClient(who(ctx));
     if (!r.ok) return failFrom(r);
@@ -54,7 +54,7 @@ const updateIdealClientTool: AgentTool<z.infer<typeof updateInput>> = {
   description: "Save what the user tells you about their ideal client. Send ONLY the fields they stated in this conversation; fields you leave out are kept as they are, and a list you send REPLACES that list (so include the existing items when adding one). Never guess an industry, location or amount.",
   risk: "SAFE_MUTATION",
   input: updateInput,
-  authorize: needsPermission("deals.create", "changing your ideal client"),
+  authorize: needsPermission("leads.manage", "changing your ideal client"),
   async prepare(ctx, input) {
     const p = await planIdealClient(who(ctx), input);
     if (!p.ok) return { ok: false, code: p.code, message: p.message };
@@ -71,7 +71,7 @@ const assessLeadFitTool: AgentTool<{ leadId: number }> = {
   description: "Check one lead against the user's ideal client with the app's plain rules: industry, location, estimated value and exclusions, each with what was compared. A field the lead lacks is 'unknown', never a mismatch. Report the result as given; do not add your own verdict.",
   risk: "READ_ONLY", activity: "searching",
   input: z.object({ leadId: z.number().describe("Lead id") }),
-  authorize: needsRead("deals"),
+  authorize: needsRead("finding"),
   async run(ctx, { leadId }): Promise<ToolOutcome> {
     const r = await assessLeadFit(who(ctx), leadId);
     if (!r.ok) return failFrom(r);

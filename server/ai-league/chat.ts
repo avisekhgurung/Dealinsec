@@ -31,7 +31,7 @@ export const BOT_TOOLS: Record<Bot, readonly string[]> = {
   zee: ["get_pending_work", "get_money_radar", "search_invoices", "search_quotations", "search_agreements", "get_lead_followups", "get_deal_health", "get_recent_activity", "get_account_status", "list_campaigns", "get_campaign"],
 };
 
-const canWrite = needsPermission("deals.create", "starting AI team tasks");
+const canWrite = needsPermission("ai.tasks", "starting AI Team tasks");
 
 /** "Start the task": validates with the task's own schema, previews what will happen, and creates a durable run. */
 /** What the person reads before a task starts: the same lines whether the coworker starts it or a teammate hands it over. */

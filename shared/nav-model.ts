@@ -18,7 +18,7 @@ import { canSeeModule } from "./permissions";
 import { DEAL_SUITE_HIDDEN } from "./flags";
 
 export type NavGroup = "home" | "league" | "outbound" | "pipeline" | "documents" | "money" | "account";
-export type NavModule = "deals" | "quotations" | "agreements" | "invoices";
+export type NavModule = "finding" | "deals" | "quotations" | "agreements" | "invoices";
 export type NavKey =
   | "home" | "league" | "outbound" | "leads" | "deals" | "quotations" | "agreements" | "invoices" | "profile" | "settings";
 
@@ -74,9 +74,9 @@ const def = (item: Omit<NavItem, "isActive">): NavItem => ({
 /** Every signed-in destination, in workflow order. */
 export const NAV_ITEMS: readonly NavItem[] = [
   def({ key: "home", label: "Home", shortLabel: "Home", href: "/dashboard", group: "home" }),
-  def({ key: "league", label: "AI Team", shortLabel: "AI Team", href: "/ai-league", group: "league", module: "deals" }),
-  def({ key: "outbound", label: "Client Radar 🔎", shortLabel: "Radar", href: "/outbound", group: "outbound", module: "deals" }),
-  def({ key: "leads", label: "Leads", shortLabel: "Leads", href: "/leads", group: "outbound", module: "deals" }),
+  def({ key: "league", label: "AI Team", shortLabel: "AI Team", href: "/ai-league", group: "league", module: "finding" }),
+  def({ key: "outbound", label: "Client Radar 🔎", shortLabel: "Radar", href: "/outbound", group: "outbound", module: "finding" }),
+  def({ key: "leads", label: "Leads", shortLabel: "Leads", href: "/leads", group: "outbound", module: "finding" }),
   def({ key: "deals", label: "Deals", shortLabel: "Deals", href: "/deals", group: "pipeline", module: "deals" }),
   def({ key: "quotations", label: "Quotations", shortLabel: "Quotes", href: "/quotations", group: "documents", module: "quotations" }),
   def({ key: "agreements", label: "Agreements", shortLabel: "Agreements", href: "/contracts", group: "documents", module: "agreements" }),

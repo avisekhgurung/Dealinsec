@@ -306,7 +306,7 @@ export default function OutboundPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { openUpgradeModal } = useUpgradeModal();
-  const canEdit = memberCan(user as any, "deals.create");
+  const canEdit = memberCan(user as any, "radar.search");
   const [text, setText] = useState("");
   const [parsed, setParsed] = useState<ParsedIcp | null>(null);
   const [runId, setRunId] = useState<string | null>(null);

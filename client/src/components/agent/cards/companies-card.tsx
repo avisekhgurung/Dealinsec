@@ -30,7 +30,7 @@ export function CompaniesCard({ card }: { card: AgentCard }) {
   const items = Array.isArray(d.companies) ? d.companies : [];
   const { user } = useAuth();
   const { toast } = useToast();
-  const canAdd = memberCan(user as any, "deals.create");
+  const canAdd = memberCan(user as any, "leads.manage");
   const [added, setAdded] = useState<Record<string, number>>({});
   const add = useMutation({
     mutationFn: async (c: Item) => {

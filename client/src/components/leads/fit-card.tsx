@@ -22,7 +22,7 @@ const VERDICT_STYLE: Record<string, string> = {
 
 export function FitCard({ leadId }: { leadId: number }) {
   const { user } = useAuth();
-  const canEdit = memberCan(user as any, "deals.create");
+  const canEdit = memberCan(user as any, "leads.manage");
   const [open, setOpen] = useState(false);
   const { data, error } = useQuery<{ fit: FitResult; profileSet: boolean; notes?: { title: string; kind: string; text: string }[] }>({ queryKey: [fitUrl(leadId)] });
   if (profileNotSetUp(error) || !data) return null;

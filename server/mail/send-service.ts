@@ -250,7 +250,7 @@ export async function sendApproved(user: Member, messageId: number, bodyHash: un
 /** The send state of one message (null when it was never handed to a mailbox). Recovers expired leases first. */
 export async function sendStateFor(user: Member, messageId: number, deps: SendDeps): Promise<Fail | { ok: true; send: SendView | null }> {
   if (!user.organizationId) return fail(403, "no_organization", "Finish setting up your workspace first.");
-  if (!canReadModule(user as any, "deals")) return fail(403, "forbidden", "Your role doesn't include viewing leads.");
+  if (!canReadModule(user as any, "finding")) return fail(403, "forbidden", "Your role doesn't include viewing leads.");
   if (!Number.isSafeInteger(messageId) || messageId <= 0) return fail(404, "not_found", REFUSALS.not_found[1]);
   await deps.sends.recoverExpired({ orgId: user.organizationId, now: deps.now() });
   const job = await deps.sends.jobFor(user.organizationId, messageId);
@@ -260,7 +260,7 @@ export async function sendStateFor(user: Member, messageId: number, deps: SendDe
 
 /** The sender, or (once the sender has left the organization) someone who manages the team. */
 async function mayResolve(user: Member, job: SendJobView, deps: SendDeps): Promise<boolean> {
-  if (!canReadModule(user as any, "deals")) return false;
+  if (!canReadModule(user as any, "finding")) return false;
   if (job.requestedBy === user.id) return mayConnect(user);
   return memberCan(user as any, "team.manage") && !(await deps.isActiveMember(job.organizationId, job.requestedBy));
 }

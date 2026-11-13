@@ -43,7 +43,7 @@ export default function OutreachStudioPage() {
   const [researchOpen, setResearchOpen] = useState(false);
   const calm = useCalmMotion();
   const { user } = useAuth();
-  const canEdit = memberCan(user as any, "deals.create");
+  const canEdit = memberCan(user as any, "outreach.send");
   const gmail = useGmailCanSend();
 
   const detail = useQuery<LeadDetailView>({ queryKey: [detailUrl(id)], enabled: id > 0 });

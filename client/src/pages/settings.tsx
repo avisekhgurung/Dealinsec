@@ -376,9 +376,11 @@ export default function SettingsPage() {
   // language are noise until a second person exists, so they stay out of the
   // way until the first invite (or bought seats) — nothing is removed.
   const isSolo = org ? org.seatsUsed <= 1 && org.pendingInvites === 0 && org.extraSeats === 0 : false;
+  // With no roles yet, the invite starts on "Create a new role" so the owner names one and ticks its permissions
+  // right there; nothing is pre-made.
   const openInvite = () =>
     seatsFree > 0
-      ? setInviteOpen(true)
+      ? (setInviteRole(customRoles.length === 0 && isOwner ? NEW_ROLE : ""), setInviteOpen(true))
       : (setSeatMessage(`Your current plan allows ${org?.seatLimit ?? 1} team member${(org?.seatLimit ?? 1) === 1 ? "" : "s"}. Upgrade your plan or buy extra seats.`), setSeatDialogOpen(true));
 
 
@@ -534,7 +536,7 @@ export default function SettingsPage() {
                 {!DEAL_SUITE_HIDDEN && <DocumentStyleCard canEdit={memberCan(user as any, "org.settings")} />}
 
                 {/* The saved ideal client and offer: same record and dialog as the Leads page, made findable here. */}
-                <IdealClientCard canEdit={memberCan(user as any, "deals.create")} />
+                <IdealClientCard canEdit={memberCan(user as any, "leads.manage")} />
               </>
             )}
 
@@ -697,7 +699,7 @@ export default function SettingsPage() {
                 {canManageTeam && (
                   <SettingsSection
                     title={<>Roles &amp; permissions</>}
-                    description="Edit the default roles, delete the ones you don't need, or create your own with exactly the permissions you want."
+                    description="Nothing is built in: create each role with exactly the permissions it needs, for finding clients as much as for the paperwork."
                     action={isOwner ? (
                       <Button
                         variant="outline"
@@ -710,6 +712,9 @@ export default function SettingsPage() {
                       </Button>
                     ) : undefined}
                   >
+                    {customRoles.length === 0 && (
+                      <p className="text-sm text-muted-foreground" data-testid="roles-empty">No roles yet. Create one here, or while inviting someone.</p>
+                    )}
                     <div className="grid sm:grid-cols-2 gap-2.5">
                       {customRoles.map((r) => (
                         <div key={r.id} className="rounded-xl border border-primary/30 bg-primary/[0.03] p-3" data-testid={`custom-role-${r.name}`}>

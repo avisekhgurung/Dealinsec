@@ -1275,7 +1275,7 @@ describe("isolation and permissions", () => {
   });
   it("a member who can't change leads can read results but start nothing and add nothing", async () => {
     const id = await start(); await drive(id);
-    const viewer = { ...user(), orgRole: "CUSTOM", customPermissions: ["deals.edit"] };
+    const viewer = { ...user(), orgRole: "CUSTOM", customPermissions: ["ai.tasks"] };
     const nw = world().outbound.prospects.find((p) => p.domain === "northwind.com")!;
     expect((await getRun(viewer, id, deps())).ok).toBe(true);
     for (const r of [await parseIcp(viewer, REQUEST, deps()), await addToLeads(viewer, nw.id, {}, deps()), await generateAngle(viewer, nw.id, deps()), await researchProspect(viewer, nw.id, id, deps())]) expect(r).toMatchObject({ ok: false, code: "forbidden" });

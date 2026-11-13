@@ -33,7 +33,7 @@ const world = () => (globalThis as any).__world as World;
 const OWNER = () => userRow() as any;
 const OTHER_ORG = () => userRow({ id: "u2", organizationId: ORG2 }) as any;
 /** Reads the pipeline (deals.edit) but may not change leads (no deals.create). */
-const VIEWER = () => userRow({ id: "u3", orgRole: "CUSTOM", customPermissions: ["deals.edit"] }) as any;
+const VIEWER = () => userRow({ id: "u3", orgRole: "CUSTOM", customPermissions: ["ai.tasks"] }) as any;
 const NOBODY = () => userRow({ id: "u4", orgRole: "CUSTOM", customPermissions: [] }) as any;
 const NOW = new Date("2026-10-14T10:00:00Z");
 const d = { now: () => NOW };

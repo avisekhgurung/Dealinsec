@@ -665,7 +665,7 @@ export default function DashboardPage() {
   const fmt = useMoney();
   const canCreateDeal = memberCan(user as any, "deals.create");
   // Client Radar sits under the deals module in the nav (shared/nav-model.ts), so the same check decides its shortcut.
-  const canSeeOutbound = canSeeModule(user as any, "deals");
+  const canSeeOutbound = canSeeModule(user as any, "finding");
   const displayName = user?.firstName && user?.lastName
     ? `${user.firstName} ${user.lastName}`
     : user?.email?.split("@")[0] || "there";
@@ -699,7 +699,7 @@ export default function DashboardPage() {
 
   // Lead counts, to decide first-run: finding clients is the product, so having leads means this account has
   // started even with no deals. The same query key as LeadsStrip's, so the strip's own read is reused, not repeated.
-  const leadCounts = useQuery<LeadList>({ queryKey: [leadListUrl({})], enabled: canSeeModule(user as any, "deals"), retry: false });
+  const leadCounts = useQuery<LeadList>({ queryKey: [leadListUrl({})], enabled: canSeeModule(user as any, "finding"), retry: false });
 
   const isLoading = dealsLoading || contractsLoading || invoicesLoading;
 

@@ -23,7 +23,7 @@ const listClientProfilesTool: AgentTool<Record<string, never>> = {
   description: "The person's saved client profiles: who they want as clients, each with an id, its kinds of company, places, size, the services they sell to them, the buying signals they care about and what a company must have. Use it when they mention a profile, or before starting a search for a kind of client they have already described. To search from one, pass its id as profileId (and one of its kinds of company as kind) when starting the research task: the search is then built from the profile exactly.",
   risk: "READ_ONLY", activity: "searching",
   input: z.object({}),
-  authorize: needsRead("deals"),
+  authorize: needsRead("finding"),
   async run(ctx): Promise<ToolOutcome> {
     const { listProfiles } = await import("../../profiles/service");
     const r = await listProfiles(who(ctx));
@@ -49,7 +49,7 @@ const listCampaignsTool: AgentTool<Record<string, never>> = {
   description: "The person's outreach campaigns (groups of leads written to together), each with an id and its real numbers: leads, drafts waiting to be read, approved, sent, replies, bounces, and why drafting or sending stopped if it did. Use it for any question about how outreach campaigns are doing or what needs doing in them. Report the numbers as given; a rate is unknown until something was sent.",
   risk: "READ_ONLY", activity: "searching",
   input: z.object({}),
-  authorize: needsRead("deals"),
+  authorize: needsRead("finding"),
   async run(ctx): Promise<ToolOutcome> {
     const { listCampaigns } = await import("../../campaigns/service");
     const r = await listCampaigns(who(ctx));
@@ -74,7 +74,7 @@ const getCampaignTool: AgentTool<{ campaignId: number }> = {
   description: "One outreach campaign, lead by lead: where each lead stands (waiting for a draft, draft to review, approved, sent, skipped) and the reason when it was skipped or held back, plus who replied or bounced. Use it to say what needs the person in a campaign. It never returns a message's text.",
   risk: "READ_ONLY", activity: "searching",
   input: z.object({ campaignId: z.number().int().positive().describe("The id from list_campaigns") }).strict(),
-  authorize: needsRead("deals"),
+  authorize: needsRead("finding"),
   async run(ctx, { campaignId }): Promise<ToolOutcome> {
     const { getCampaign } = await import("../../campaigns/service");
     const r = await getCampaign(who(ctx), campaignId, {}, { readOnly: true });

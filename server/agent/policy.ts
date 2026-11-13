@@ -37,7 +37,7 @@ export function authorizeCall<I>(tool: AgentTool<I>, user: AgentUser | null | un
 // requireOrgPermission), so the agent can never read or do more than the
 // member's own screens allow.
 
-type Module = "deals" | "quotations" | "agreements" | "invoices";
+type Module = "finding" | "deals" | "quotations" | "agreements" | "invoices";
 
 /** Reads: every module named must be readable (custom roles are narrowed). */
 export const needsRead = (...modules: Module[]) => (user: AgentUser): string | null => {

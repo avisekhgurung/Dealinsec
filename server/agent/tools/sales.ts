@@ -23,8 +23,8 @@ import { needsPermission, needsRead } from "../policy";
 import type { AgentTool, ToolContext, ToolOutcome } from "../types";
 import { fail } from "./shared";
 
-const canWrite = needsPermission("deals.create", "changing leads");
-const readLeads = needsRead("deals");
+const canWrite = needsPermission("outreach.send", "working on outreach");
+const readLeads = needsRead("finding");
 const who = (ctx: ToolContext) => ctx.user as any;
 const route = (id: number) => `/leads/${id}`;
 const failFrom = (r: { code: string; message: string }): Extract<ToolOutcome, { ok: false }> => fail(r.code, r.message);

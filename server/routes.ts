@@ -1,3 +1,4 @@
+import type { Permission } from "@shared/permissions";
 import { dealTypeForService, isEngagementModel, validateEngagement } from "@shared/engagement";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
@@ -627,6 +628,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Before every route, so no GET can answer a stale tab without it.
   app.use("/api", legacyMoneyReadCompat);
   await setupAuth(app);
+  // The client-finding APIs (13 Nov 2026): reading any of them needs a finding permission, and a write needs the
+  // module's own. One guard here, so a custom role that lacks these never reaches the handlers; the services keep
+  // their own checks as well (server/services/leads.ts, the mail services). Owners and legacy roles pass as before.
+  const FINDING_WRITE: [string, Permission][] = [
+    ["/api/outbound", "radar.search"], ["/api/social", "radar.search"], ["/api/client-profiles", "radar.search"],
+    ["/api/leads", "leads.manage"], ["/api/ideal-client", "leads.manage"],
+    ["/api/sales", "outreach.send"], ["/api/channels", "outreach.send"], ["/api/campaigns", "outreach.send"], ["/api/outreach", "outreach.send"],
+    ["/api/ai-league", "ai.tasks"],
+  ];
+  app.use(FINDING_WRITE.map(([p]) => p), isAuthenticated, requireModuleRead("finding"), (req: any, res, next) => {
+    if (req.method === "GET" || req.method === "HEAD") return next();
+    const perm = FINDING_WRITE.find(([p]) => req.baseUrl === p || req.baseUrl.startsWith(`${p}/`))?.[1];
+    return perm ? requireOrgPermission(perm)(req, res, next) : next();
+  });
   registerCopilotRoutes(app);
   registerAgentRoutes(app);
   registerLeadRoutes(app);
@@ -2254,9 +2269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/org/roles", isAuthenticated, requireOrgPermission("team.manage"), withOrg, async (req: any, res) => {
     try {
-      // Lazy one-shot seed for orgs that predate editable default roles —
-      // the latch means a deliberately deleted default never resurrects.
-      if (!req.org.rolesSeeded) await storage.seedDefaultRoles(req.org.id);
+      // No seeding (13 Nov 2026): a workspace's roles are only the ones its owner created.
       const roles = await storage.getOrgRoles(req.org.id);
       const withUsage = await Promise.all(roles.map(async (r) => ({
         ...r,

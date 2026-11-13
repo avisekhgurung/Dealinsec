@@ -35,7 +35,8 @@ const OWNER = () => userRow() as any;
 const OTHER_ORG = () => userRow({ id: "u2", organizationId: ORG2 }) as any;
 const ACCOUNTS = () => userRow({ id: "u3", orgRole: "ACCOUNTS" }) as any;
 const INVOICES_ONLY = () => userRow({ id: "u4", orgRole: "CUSTOM", customPermissions: ["invoices.create"] }) as any;
-const DEALS_READER = () => userRow({ id: "u5", orgRole: "CUSTOM", customPermissions: ["quotations.create"] }) as any;
+const DEALS_ONLY = () => userRow({ id: "u5", orgRole: "CUSTOM", customPermissions: ["quotations.create", "deals.create"] }) as any;
+const FINDING_READER = () => userRow({ id: "u6", orgRole: "CUSTOM", customPermissions: ["ai.tasks"] }) as any;
 const NO_ORG = () => userRow({ id: "u6", organizationId: null }) as any;
 
 let pid = 0, fid = 0, iid = 0;
@@ -101,12 +102,13 @@ describe("the table", () => {
     expect(await list(params)).toMatchObject({ ok: false, status: 400, code: "invalid_query" });
   });
 
-  it("follows the module permissions: no organization, or no read access to deals, is refused", async () => {
+  it("follows the module permissions: no organization, or no finding permission at all, is refused", async () => {
     prospect();
     expect(await list({}, NO_ORG())).toMatchObject({ ok: false, status: 403 });
     expect(await list({}, INVOICES_ONLY())).toMatchObject({ ok: false, status: 403 });
+    expect(await list({}, DEALS_ONLY())).toMatchObject({ ok: false, status: 403 }); // the paperwork alone does not open the prospects
     expect((await list({}, ACCOUNTS())).ok).toBe(true); // built-in roles read every module
-    expect((await list({}, DEALS_READER())).ok).toBe(true);
+    expect((await list({}, FINDING_READER())).ok).toBe(true);
   });
 
   it("says when the feature isn't set up", async () => {
@@ -219,7 +221,7 @@ describe("exports", () => {
   it("needs the right to work with leads, not only to read them", async () => {
     const p = prospect();
     expect(await exp({ format: "csv", scope: { mode: "ids", ids: [p.id] } }, ACCOUNTS())).toMatchObject({ ok: false, status: 403 });
-    expect(await exp({ format: "csv", scope: { mode: "ids", ids: [p.id] } }, DEALS_READER())).toMatchObject({ ok: false, status: 403 });
+    expect(await exp({ format: "csv", scope: { mode: "ids", ids: [p.id] } }, FINDING_READER())).toMatchObject({ ok: false, status: 403 });
     expect(await exp({ format: "csv", scope: { mode: "ids", ids: [p.id] } }, NO_ORG())).toMatchObject({ ok: false, status: 403 });
   });
 

@@ -248,7 +248,7 @@ describe("what the agent is told", () => {
   });
   it("a role that can't read deals can use none of these tools; one that can read but not change can use the reads only", () => {
     const nobody = userRow({ orgRole: "CUSTOM", customPermissions: [] });
-    const viewer = userRow({ orgRole: "CUSTOM", customPermissions: ["deals.edit"] });
+    const viewer = userRow({ orgRole: "CUSTOM", customPermissions: ["ai.tasks"] });
     for (const n of ["parse_icp", "discover_prospects", "get_discovery_run", "get_prospect_intelligence", "research_prospect", "find_decision_maker", "get_outreach_angle", "add_prospect_to_leads"]) expect(authorizeCall(tool(n), nobody, {} as any), n).not.toBeNull();
     for (const n of ["get_discovery_run", "get_prospect_intelligence"]) expect(authorizeCall(tool(n), viewer, {} as any), n).toBeNull();
     for (const n of ["parse_icp", "discover_prospects", "research_prospect", "find_decision_maker", "get_outreach_angle", "add_prospect_to_leads"]) expect(authorizeCall(tool(n), viewer, {} as any), n).not.toBeNull();

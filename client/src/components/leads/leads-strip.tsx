@@ -8,7 +8,7 @@ import { listUrl, type LeadList } from "@/lib/leads";
 
 export function LeadsStrip() {
   const { user } = useAuth();
-  const allowed = canSeeModule(user as any, "deals");
+  const allowed = canSeeModule(user as any, "finding");
   const { data } = useQuery<LeadList>({ queryKey: [listUrl({})], enabled: allowed });
   if (!allowed || !data) return null;
   const c = data.counts;

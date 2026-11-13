@@ -74,7 +74,7 @@ const sameHash = (a: string, b: string) => { const x = Buffer.from(a), y = Buffe
 
 /** May this person connect a mailbox? An active member whose role lets them work on leads. */
 export function mayConnect(u: Member | null | undefined): u is Member & { organizationId: string } {
-  return !!u && !!u.organizationId && u.memberStatus !== "removed" && canReadModule(u as any, "deals") && memberCan(u as any, "deals.create");
+  return !!u && !!u.organizationId && u.memberStatus !== "removed" && canReadModule(u as any, "finding") && memberCan(u as any, "outreach.send");
 }
 
 /**

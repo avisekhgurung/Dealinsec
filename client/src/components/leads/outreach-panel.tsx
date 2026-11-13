@@ -56,7 +56,7 @@ export const mailtoFor = (m: Pick<Message, "to" | "subject" | "body">) =>
 export function OutreachPanel({ leadId }: { leadId: number }) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const canRun = memberCan(user as any, "deals.create");
+  const canRun = memberCan(user as any, "outreach.send");
   const gmail = useGmailCanSend(); // only offered (and mentioned) where this person can really send from Gmail
   const read = repliesAreRead(useGmailStatus().data); // the same status the line above reads: no extra request
   const q = useQuery<{ messages: Message[]; sample?: { title: string; scope: string } | null; /** Older servers omit it. */ style?: ProfileStyleView | null; /** Older servers omit it. */ followUp?: FollowUpView | null; /** Older servers omit both. */ gap?: Gap | null; hasWebsite?: boolean }>({ queryKey: [messagesUrl(leadId)], retry: false });

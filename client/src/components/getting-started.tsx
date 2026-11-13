@@ -71,7 +71,7 @@ export function GettingStarted() {
   const [dismissed, setDismissed] = useState(() => isGettingStartedDismissed(userId));
   const visible = !!userId && !dismissed;
 
-  const seeDeals = canSeeModule(user as any, "deals");
+  const seeDeals = canSeeModule(user as any, "finding");
   const deals = useQuery<Deal[]>({ queryKey: ["/api/deals"] });
   const quotes = useQuery<Quote[]>({ queryKey: ["/api/quotes"] });
   const contracts = useQuery<Contract[]>({ queryKey: ["/api/contracts"] });
