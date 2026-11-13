@@ -1,5 +1,5 @@
 /**
- * Settings → Integrations: Gmail only. GmailCard decides for itself what to show, and this panel only
+ * Settings → Integrations: Google Mail (Gmail or Google Workspace) only. GmailCard decides for itself what to show, and this panel only
  * fills the gaps it leaves (loading, a failed load, or Gmail not switched on for this workspace), reading the same
  * GET /api/integrations/gmail answer, so it never says "connected" unless the server does.
  */
@@ -54,10 +54,10 @@ export function IntegrationsPanel() {
 
       {gmailOff && (
         <UnavailableIntegration
-          name="Gmail"
+          name="Google Mail (Gmail or Google Workspace)"
           icon={Mail}
           status="Early access"
-          description="Gmail is in limited early access and isn't switched on for your workspace yet, so there's nothing to connect here."
+          description="Connecting Gmail or a Google Workspace address is in limited early access and isn't switched on for your workspace yet, so there's nothing to connect here."
           testId="gmail-unavailable"
         />
       )}

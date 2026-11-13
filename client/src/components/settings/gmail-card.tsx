@@ -63,7 +63,7 @@ export function GmailCard() {
   });
   const runDisconnect = async () => {
     const what = rs?.granted ? "DealInSec's access is removed at Google, the stored credentials are deleted, and so is every synced message." : "DealInSec's access is removed at Google and the stored credentials are deleted.";
-    if (!(await confirm({ title: "Disconnect Gmail?", description: `${what} You can connect again any time.`, confirmText: "Disconnect", destructive: true }))) return;
+    if (!(await confirm({ title: "Disconnect this mailbox?", description: `${what} You can connect again any time.`, confirmText: "Disconnect", destructive: true }))) return;
     disconnect.mutate(undefined, {
       onSuccess: (r) => { setOutcome(null); toast(r.revoked === false
         ? { title: "Disconnected", description: "Stored access deleted. Google didn't confirm the removal, so you may also remove DealInSec under Third-party access in your Google account." }
@@ -77,11 +77,11 @@ export function GmailCard() {
       <CardContent className="space-y-4 p-5 lg:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="flex items-center gap-2 text-lg font-bold"><Mail className="h-5 w-5" aria-hidden />Gmail</h2>
+            <h2 className="flex items-center gap-2 text-lg font-bold"><Mail className="h-5 w-5" aria-hidden />Google Mail <span className="text-sm font-normal text-muted-foreground">Gmail or Google Workspace</span></h2>
             <p className="text-sm text-muted-foreground">
               {data.sendingEnabled
-                ? <>Connect your own Gmail so approved messages can go out from your address{rs?.available ? ", and replies to your outreach show up in DealInSec" : ""}.</>
-                : <>Gmail is in limited early access. {rs?.available ? "Connect it so replies to your outreach show up in DealInSec. " : ""}Sending email from DealInSec isn't switched on yet, so nothing is sent from your mailbox. Connecting now gets it ready.</>}
+                ? <>Connect your Gmail, or your business address on Google Workspace (you@yourcompany.com), so approved messages go out from it{rs?.available ? ", and replies to your outreach show up in DealInSec" : ""}.</>
+                : <>Google Mail (Gmail and Google Workspace) is in limited early access. {rs?.available ? "Connect it so replies to your outreach show up in DealInSec. " : ""}Sending email from DealInSec isn't switched on yet, so nothing is sent from your mailbox. Connecting now gets it ready.</>}
             </p>
           </div>
           {c && (
@@ -153,7 +153,7 @@ export function GmailCard() {
             <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground" data-testid="gmail-disclosure">
               {disclosure.map((d) => <li key={d}>{d}</li>)}
             </ul>
-            <Button onClick={startConnect} disabled={busy} data-testid="gmail-connect">{connect.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Connect Gmail</Button>
+            <Button onClick={startConnect} disabled={busy} data-testid="gmail-connect">{connect.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Connect Google Mail</Button>
           </div>
         ) : (
           <p className="text-sm text-muted-foreground" data-testid="gmail-not-allowed">Your role doesn't include working on leads, so you can't connect a mailbox. Ask the workspace Owner.</p>
