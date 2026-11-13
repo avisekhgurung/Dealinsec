@@ -20,7 +20,8 @@ export const ORGANIZATION_ID = `${SITE_ORIGIN}/#organization`;
  *
  * Why it exists: without it, search and AI answer engines had nothing tying the site to its other properties, so they
  * reconstructed the entity from whatever third-party listing they found — which is how Google's AI Overview came to
- * describe DealInSec as a "deal-management, quote-to-cash platform" at ₹199/month, quoting a directory entry and the
+ * describe DealInSec as a "deal-management, quote-to-cash platform" at a price it had already left behind, quoting
+ * a directory entry and the
  * repository's old README instead of this site.
  *
  * Rule: every URL here must be a profile that EXISTS and that we control, checked before it is added. An invented or

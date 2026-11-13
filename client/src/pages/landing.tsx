@@ -50,7 +50,7 @@ import {
   Bot,
   TrendingUp,
 } from "lucide-react";
-import { SiGoogle, SiInstagram, SiYoutube, SiX, SiFacebook, SiLinkedin } from "react-icons/si";
+import { SiGoogle, SiInstagram, SiYoutube, SiFacebook, SiLinkedin } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation, Link } from "wouter";
@@ -895,7 +895,9 @@ function Footer() {
           </nav>
           <div className="flex items-center gap-2">
             {[
-              { Icon: SiX, href: "https://x.com/dealinsec", label: "X" },
+              // No X icon: x.com/dealinsec is a 404 and the handle is not ours. A dead profile link on every page
+              // is a broken outbound link for crawlers and a dead end for readers. Add it back only once the
+              // handle exists, and add it to ORGANIZATION_SAME_AS in server/site-head.ts at the same time.
               { Icon: SiLinkedin, href: "https://www.linkedin.com/company/dealinsec", label: "LinkedIn" },
               { Icon: SiInstagram, href: "https://www.instagram.com/dealinsec", label: "Instagram" },
             ].map(({ Icon, href, label }) => (
