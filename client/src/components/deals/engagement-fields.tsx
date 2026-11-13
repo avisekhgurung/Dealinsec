@@ -157,10 +157,12 @@ export function ServiceSelect({ value, onChange, id }: { value: string | null; o
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" aria-hidden />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] min-w-[18rem] p-0" align="start">
+      {/* Always below the field (13 Nov 2026): on a phone the keyboard leaves little room under the trigger, and
+          Radix would flip the menu above it, where the header hid its top. The list sizes itself to the room left. */}
+      <PopoverContent className="w-[--radix-popover-trigger-width] min-w-[18rem] p-0" align="start" side="bottom" avoidCollisions={false} collisionPadding={8}>
         <Command>
           <CommandInput placeholder="Search services…" />
-          <CommandList className="max-h-72">
+          <CommandList className="max-h-[min(18rem,calc(var(--radix-popover-content-available-height)-3.25rem))]">
             <CommandEmpty>No service matches. Choose "Other service", or leave it empty.</CommandEmpty>
             {value && (
               <CommandGroup>
