@@ -209,7 +209,7 @@ export const ITEMS_JS = `
           '<input class="f" placeholder="Description" value="'+esc(it.desc)+'" data-i="'+i+'" data-k="desc" />'+
           '<input class="f" type="number" min="0" placeholder="Qty" value="'+esc(it.qty)+'" data-i="'+i+'" data-k="qty" />'+
           '<input class="f" type="number" min="0" placeholder="Rate" value="'+esc(it.rate)+'" data-i="'+i+'" data-k="rate" />'+
-          '<button type="button" data-rm="'+i+'" title="Remove" style="border:1.5px solid var(--line);background:#fff;border-radius:8px;height:40px;cursor:pointer;color:#94A3B8;font-size:18px">&times;</button>';
+          '<button type="button" data-rm="'+i+'" title="Remove" style="border:1.5px solid var(--line);background:var(--card);border-radius:8px;height:40px;cursor:pointer;color:#94A3B8;font-size:18px">&times;</button>';
         c.appendChild(row);
       });
     }

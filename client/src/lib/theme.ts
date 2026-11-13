@@ -1,51 +1,32 @@
 /**
- * Theme preference — light / dark / system, per device.
+ * Theme: DealInSec is dark, end to end (13 Nov 2026, founder's decision), on every page, signed in or not.
  *
- * The `dark` class on <html> is the single switch the whole stylesheet keys
- * off (.dark vars in index.css + dark: variants everywhere). The inline
- * bootstrap in index.html applies the stored preference BEFORE first paint
- * so there's never a flash;
- * this module is the runtime side: reading, setting, and following OS
- * changes while the "system" preference is active.
+ * The `dark` class on <html> is the single switch the whole stylesheet keys off (.dark vars in index.css + dark:
+ * variants everywhere). The inline bootstrap in index.html adds it BEFORE first paint so nothing flashes; this module
+ * is the runtime side.
  *
- * DEFAULT IS LIGHT, not system — the app has always been light, so an OS
- * dark-mode user must opt in rather than get silently flipped by a deploy.
+ * The one exception is paper. Documents are formal and white: the quotation, agreement and invoice pages, the public
+ * accept and sign links, and anything printed or exported. App.tsx calls setDocumentLight() for those routes, and
+ * strips the class for the duration of a print, so the whole cascade flips to light at once instead of 128 variables
+ * being overridden one by one. There is no per-device preference any more; the old `dis_theme` key is ignored.
  */
 
-export type ThemePref = "light" | "dark" | "system";
-
-const KEY = "dis_theme";
-const mq = () => window.matchMedia("(prefers-color-scheme: dark)");
-
-export function getThemePref(): ThemePref {
-  try {
-    const v = localStorage.getItem(KEY);
-    return v === "dark" || v === "system" ? v : "light";
-  } catch {
-    return "light";
-  }
-}
-
-/** The signed-in workspace wears the ink-green of its top and bottom bars
- *  in the phone's status bar too; the marketing pages keep the plain theme
- *  colour. Matches the top of .dis-topnav / .dis-bottomnav in index.css. */
-const APP_STATUS_BAR = { light: "#163630", dark: "#12211f" };
+/** The signed-in workspace wears the ink-green of its top and bottom bars in the phone's status bar too; the public
+ *  pages keep the plain dark colour. Matches the top of .dis-topnav / .dis-bottomnav in index.css. */
+const APP_STATUS_BAR = "#12211f";
+const PAGE_STATUS_BAR = "#0B1220";
+const PAPER_STATUS_BAR = "#FFFFFF";
 
 function isDark(): boolean {
   return document.documentElement.classList.contains("dark");
 }
 
-/** Re-tint the status bar / PWA chrome for the current theme and page. */
+/** Re-tint the status bar / PWA chrome for the current page. */
 export function applyStatusBar() {
   const dark = isDark();
   const inApp = document.documentElement.hasAttribute("data-app-shell");
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) {
-    meta.setAttribute(
-      "content",
-      inApp ? (dark ? APP_STATUS_BAR.dark : APP_STATUS_BAR.light) : dark ? "#0B1220" : "#FFFFFF",
-    );
-  }
+  if (meta) meta.setAttribute("content", !dark ? PAPER_STATUS_BAR : inApp ? APP_STATUS_BAR : PAGE_STATUS_BAR);
   // iOS can only draw black or white here; keep its text readable.
   const ios = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
   if (ios) ios.setAttribute("content", dark ? "black-translucent" : "default");
@@ -57,27 +38,14 @@ export function setAppShell(on: boolean) {
   applyStatusBar();
 }
 
-function apply(pref: ThemePref) {
-  const dark = pref === "dark" || (pref === "system" && mq().matches);
-  document.documentElement.classList.toggle("dark", dark);
-  // Keep the mobile status bar / PWA chrome in step with the theme —
-  // otherwise Android shows an emerald bar over a dark app (and iOS keeps a
-  // translucent bar with light text on a white page).
+/** A document page renders on white; everything else is dark. */
+export function setDocumentLight(light: boolean) {
+  document.documentElement.classList.toggle("dark", !light);
   applyStatusBar();
 }
 
-export function setThemePref(pref: ThemePref) {
-  try {
-    localStorage.setItem(KEY, pref);
-  } catch {}
-  apply(pref);
-}
-
-/** Call once at app boot: re-applies (harmless after the bootstrap) and
- *  keeps a "system" preference tracking live OS changes. */
+/** Call once at app boot: the bootstrap already added the class; this only keeps the chrome tint in step. */
 export function initTheme() {
-  apply(getThemePref());
-  mq().addEventListener("change", () => {
-    if (getThemePref() === "system") apply("system");
-  });
+  document.documentElement.classList.add("dark");
+  applyStatusBar();
 }

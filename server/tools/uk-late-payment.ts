@@ -452,7 +452,7 @@ const STYLE = `<style>
   .card-h{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 14px;font-weight:700}
   .fld{display:block;margin-bottom:14px}
   .fld>span{display:block;font-size:13.5px;font-weight:600;margin-bottom:6px}
-  .fld input,.fld select{width:100%;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:inherit}
+  .fld input,.fld select{width:100%;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:inherit}
   .fld .hint{display:block;font-size:12px;color:var(--muted);margin-top:6px;font-style:normal;line-height:1.55}
   .res-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:14.5px}
   .res-row b{font-variant-numeric:tabular-nums;font-weight:700}
@@ -465,7 +465,7 @@ const STYLE = `<style>
   .letter-sub{font-size:12.5px;color:var(--muted);margin:0 0 10px;line-height:1.55}
   .letter-warn{font-size:12.5px;line-height:1.6;background:#fffaf0;border:1px solid #f3dfb0;color:#7a4b00;border-radius:10px;padding:11px 13px;margin:0 0 12px}
   .letter-foot{font-size:12px;color:var(--muted);margin:10px 0 0;line-height:1.55}
-  #letter{width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.65;padding:14px;border:1px solid var(--line);border-radius:10px;background:#fff;color:inherit;resize:vertical}
+  #letter{width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.65;padding:14px;border:1px solid var(--line);border-radius:10px;background:#fff;color:hsl(222 47% 11%);color-scheme:light;resize:vertical}
   .btn-copy{background:var(--green-d);color:#fff;border:0;border-radius:9px;padding:9px 14px;font-size:13.5px;font-weight:700;cursor:pointer}
   .disclaimer{font-size:12.5px;color:var(--muted);line-height:1.6;margin:14px 0 0;max-width:78ch}
   .examples{padding:26px 0 6px}

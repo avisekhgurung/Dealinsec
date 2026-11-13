@@ -179,7 +179,7 @@ const STYLE = `<style>
   .cl-title{font-weight:700;font-size:13.5px;color:var(--ink)}
   .cl-snip{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .cl-btns{display:flex;gap:4px;flex-shrink:0}
-  .cl-ico{width:30px;height:30px;border-radius:9px;border:1px solid var(--line);background:#fff;display:grid;place-items:center;cursor:pointer;color:var(--muted);transition:color .15s,border-color .15s}
+  .cl-ico{width:30px;height:30px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;cursor:pointer;color:var(--muted);transition:color .15s,border-color .15s}
   .cl-ico:hover{color:var(--green-d);border-color:var(--green)}
   .cl-ico:disabled{opacity:.35;cursor:not-allowed}
   .cl-ico.cl-del:hover{color:#DC2626;border-color:#DC2626}

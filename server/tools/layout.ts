@@ -67,7 +67,11 @@ export function esc(s: unknown): string {
 const STYLES = `<style>
   *,*::before,*::after{box-sizing:border-box}
   /* Tokens mirror the landing page's light theme (client/src/index.css). */
-  :root{--green:hsl(160 84% 30%);--green-d:hsl(160 84% 23%);--ink:hsl(222 47% 11%);--muted:hsl(215 16% 47%);--line:hsl(215 20% 88%);--card-line:hsl(215 20% 92%);--bg:hsl(210 20% 98%);--card:hsl(0 0% 100%);--accent-bg:hsl(160 60% 95%);--accent-fg:hsl(160 55% 22%);--accent-line:hsl(160 40% 85%)}
+  :root{--green:hsl(160 70% 42%);--green-d:hsl(160 84% 30%);--ink:hsl(210 25% 95%);--muted:hsl(215 15% 66%);--line:hsl(217 22% 21%);--card-line:hsl(217 22% 17%);--bg:hsl(222 40% 7%);--bg-hsl:222 40% 7%;--card:hsl(222 36% 11%);--card-hsl:222 36% 11%;--accent-bg:hsl(160 40% 14%);--accent-fg:hsl(160 60% 70%);--accent-line:hsl(160 35% 26%);color-scheme:dark}
+  /* Paper: a document is formal and white whatever the page around it (13 Nov 2026). */
+  .print-doc,.sample-doc,.paper{--green:hsl(160 84% 30%);--green-d:hsl(160 84% 23%);--ink:hsl(222 47% 11%);--muted:hsl(215 16% 47%);--line:hsl(215 20% 88%);--card-line:hsl(215 20% 92%);--bg:hsl(210 20% 98%);--card:hsl(0 0% 100%);--accent-bg:hsl(160 60% 95%);--accent-fg:hsl(160 55% 22%);--accent-line:hsl(160 40% 85%);--bg-hsl:210 20% 98%;--card-hsl:0 0% 100%;color:var(--ink);color-scheme:light}
+  @media print{:root{--green:hsl(160 84% 30%);--green-d:hsl(160 84% 23%);--ink:hsl(222 47% 11%);--muted:hsl(215 16% 47%);--line:hsl(215 20% 88%);--card-line:hsl(215 20% 92%);--bg:hsl(210 20% 98%);--card:hsl(0 0% 100%);--accent-bg:hsl(160 60% 95%);--accent-fg:hsl(160 55% 22%);--accent-line:hsl(160 40% 85%);--bg-hsl:210 20% 98%;--card-hsl:0 0% 100%}}
+
   html{-webkit-text-size-adjust:100%}
   body{margin:0;font-family:${FONT_STACK_SANS};color:var(--ink);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
   a{color:var(--green);text-decoration:none}
@@ -77,11 +81,11 @@ const STYLES = `<style>
   .btn{display:inline-flex;align-items:center;gap:8px;background:var(--green);color:#fff;font-weight:700;padding:12px 22px;border-radius:12px;border:0;cursor:pointer;font-size:15px}
   .btn:hover{background:var(--green-d);text-decoration:none;color:#fff}
   .btn.ghost{background:transparent;color:var(--green);border:1.5px solid var(--line)}
-  .btn.ghost:hover{background:#fff;border-color:var(--green)}
-  header.site{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  .btn.ghost:hover{background:var(--card);border-color:var(--green)}
+  header.site{position:sticky;top:0;z-index:20;background:hsl(var(--bg-hsl) / .88);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
   header.site .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
   /* Matches <DealinsecLogo size="md"> in the app header exactly. */
-  .brand{display:inline-flex;align-items:center;gap:9px;font-family:Inter,"Source Sans 3",sans-serif;font-size:19px;font-weight:800;line-height:1;letter-spacing:-.034em;color:#111B22}
+  .brand{display:inline-flex;align-items:center;gap:9px;font-family:Inter,"Source Sans 3",sans-serif;font-size:19px;font-weight:800;line-height:1;letter-spacing:-.034em;color:var(--ink)}
   .brand:hover{text-decoration:none}
   .logo{flex-shrink:0;filter:drop-shadow(0 1px 1px rgba(0,0,0,.05))}
   .brand-text{line-height:1;font-weight:800}
@@ -96,7 +100,7 @@ const STYLES = `<style>
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
   @media(max-width:860px){.grid2{grid-template-columns:1fr}}
   label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:12px 0 5px}
-  input.f,textarea.f,select.f{width:100%;font:inherit;font-size:15px;color:var(--ink);background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:10px 12px}
+  input.f,textarea.f,select.f{width:100%;font:inherit;font-size:15px;color:var(--ink);background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px}
   input.f:focus,textarea.f:focus,select.f:focus{outline:none;border-color:var(--green)}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
@@ -110,7 +114,7 @@ const STYLES = `<style>
   .cta-band p{color:#DCFCE7;max-width:620px;margin:0 auto 22px}
   .cta-band .btn{background:#fff;color:var(--green-d)}
   .cta-band .btn:hover{background:#F0FDF4}
-  footer.site{background:#fff;border-top:1px solid var(--line);padding:34px 0;color:var(--muted);font-size:14px}
+  footer.site{background:var(--card);border-top:1px solid var(--line);padding:34px 0;color:var(--muted);font-size:14px}
   footer.site .links{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px}
   .muted{color:var(--muted)}
 
@@ -133,7 +137,7 @@ const STYLES = `<style>
   .nav{display:none;align-items:center;gap:2px}
   @media(min-width:920px){.nav{display:flex}}
   .nav a{padding:8px 14px;border-radius:10px;font-size:14px;font-weight:600;color:var(--muted);transition:background .15s,color .15s}
-  .nav a:hover{color:var(--ink);background:hsl(210 20% 93%);text-decoration:none}
+  .nav a:hover{color:var(--ink);background:var(--line);text-decoration:none}
   .nav a.active{color:var(--accent-fg);background:var(--accent-bg)}
   .btn .ext{width:14px;height:14px;opacity:.85}
 
@@ -230,12 +234,12 @@ const STYLES = `<style>
      ============================================================================ */
   :root{
     --hdr-h:64px;                                 /* single source of truth for both sticky bars */
-    --glass:rgba(255,255,255,.66);
-    --glass-strong:rgba(255,255,255,.78);
+    --glass:hsl(var(--card-hsl) / .66);
+    --glass-strong:hsl(var(--card-hsl) / .78);
     --glass-line:hsl(215 25% 88% / .7);
-    --glass-hair:rgba(255,255,255,.85);
+    --glass-hair:hsl(var(--card-hsl) / .85);
     --glass-edge-lo:hsl(160 30% 60% / .30);
-    --glass-inset:inset 0 1px 0 rgba(255,255,255,.72), inset 0 0 0 1px rgba(255,255,255,.14);
+    --glass-inset:inset 0 1px 0 hsl(var(--card-hsl) / .72), inset 0 0 0 1px hsl(var(--card-hsl) / .14);
     --glass-shadow:0 12px 34px -14px hsl(160 45% 16% / .30);
     --shadow-green:0 10px 30px -8px hsl(160 60% 30% / .26), 0 2px 8px hsl(160 40% 20% / .08);
     --shadow-green-lg:0 22px 50px -14px hsl(160 60% 28% / .34);
@@ -257,7 +261,7 @@ const STYLES = `<style>
     background:var(--glass-strong);
     -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);
     border-bottom:1px solid hsl(160 25% 80% / .5);
-    box-shadow:0 1px 0 rgba(255,255,255,.6), 0 10px 26px -20px hsl(160 45% 16% / .6);
+    box-shadow:0 1px 0 hsl(var(--card-hsl) / .6), 0 10px 26px -20px hsl(160 45% 16% / .6);
   }
   header.site .wrap{height:var(--hdr-h)}
 
@@ -267,7 +271,7 @@ const STYLES = `<style>
     background:var(--glass-strong);
     -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);
     border-bottom:1px solid hsl(160 25% 80% / .45);
-    box-shadow:0 1px 0 rgba(255,255,255,.5);
+    box-shadow:0 1px 0 hsl(var(--card-hsl) / .5);
   }
   .tool-switch .wrap{position:relative;padding-top:0;padding-bottom:0}
   .ts-track{
@@ -286,11 +290,11 @@ const STYLES = `<style>
     color:var(--muted); border:1px solid transparent;
     transition:color .18s ease, background .18s ease, box-shadow .18s ease, transform .12s ease;
   }
-  .ts-pill:hover{color:var(--ink); background:rgba(255,255,255,.55); text-decoration:none}
+  .ts-pill:hover{color:var(--ink); background:hsl(var(--card-hsl) / .55); text-decoration:none}
   .ts-pill:active{transform:scale(.96)}
   .ts-pill.active{                                /* raised white "selected segment" */
     color:var(--green-d); font-weight:700;
-    background:#fff; border-color:var(--glass-line);
+    background:var(--card); border-color:var(--glass-line);
     box-shadow:0 2px 8px -2px rgba(16,24,40,.18), 0 0 0 1px hsl(160 40% 85% / .6);
   }
   .ts-pill:focus-visible{outline:2px solid var(--green); outline-offset:2px}
@@ -319,16 +323,16 @@ const STYLES = `<style>
             mask:linear-gradient(180deg,#000, transparent 42%);
   }
   .chip{
-    background:rgba(255,255,255,.55);
+    background:hsl(var(--card-hsl) / .55);
     -webkit-backdrop-filter:saturate(160%) blur(10px); backdrop-filter:saturate(160%) blur(10px);
-    border:1px solid rgba(255,255,255,.6); color:var(--accent-fg);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.7), 0 2px 8px -4px hsl(160 40% 20% / .26);
+    border:1px solid hsl(var(--card-hsl) / .6); color:var(--accent-fg);
+    box-shadow:inset 0 1px 0 hsl(var(--card-hsl) / .7), 0 2px 8px -4px hsl(160 40% 20% / .26);
   }
   .badge{
     background:var(--glass-strong);
     -webkit-backdrop-filter:saturate(160%) blur(10px); backdrop-filter:saturate(160%) blur(10px);
-    border:1px solid rgba(255,255,255,.6);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.7), 0 6px 16px -8px hsl(160 50% 30% / .3);
+    border:1px solid hsl(var(--card-hsl) / .6);
+    box-shadow:inset 0 1px 0 hsl(var(--card-hsl) / .7), 0 6px 16px -8px hsl(160 50% 30% / .3);
   }
   .tool-card{
     background:var(--glass);
@@ -338,11 +342,11 @@ const STYLES = `<style>
   }
   .tool-card:hover{
     box-shadow:var(--shadow-green-lg), var(--glass-inset);
-    border-color:rgba(255,255,255,.6);
+    border-color:hsl(var(--card-hsl) / .6);
   }
   .tool-ico{
     background:linear-gradient(135deg, hsl(160 60% 92%), hsl(174 55% 90%));
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.85);
+    box-shadow:inset 0 1px 0 hsl(var(--card-hsl) / .85);
   }
 
   /* "More free tools" related section (per-tool footer nav). */
@@ -360,7 +364,7 @@ const STYLES = `<style>
     color:var(--ink);font-weight:650;font-size:14px;
     transition:transform .14s ease, box-shadow .16s ease, border-color .16s ease;
   }
-  .rt-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-green),var(--glass-inset);border-color:rgba(255,255,255,.6);text-decoration:none}
+  .rt-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-green),var(--glass-inset);border-color:hsl(var(--card-hsl) / .6);text-decoration:none}
   .rt-card .rt-go{color:var(--green-d);font-weight:700;transition:transform .16s ease}
   .rt-card:hover .rt-go{transform:translateX(3px)}
 
@@ -372,14 +376,14 @@ const STYLES = `<style>
   .export-sheet{
     background:var(--glass-strong);
     -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);
-    border:1px solid rgba(255,255,255,.5);
+    border:1px solid hsl(var(--card-hsl) / .5);
     box-shadow:0 30px 72px -20px hsl(222 45% 8% / .6), var(--glass-inset);
   }
   .export-opt{
-    background:rgba(255,255,255,.55);
+    background:hsl(var(--card-hsl) / .55);
     -webkit-backdrop-filter:var(--blur-lite); backdrop-filter:var(--blur-lite);
-    border:1px solid rgba(255,255,255,.55);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+    border:1px solid hsl(var(--card-hsl) / .55);
+    box-shadow:inset 0 1px 0 hsl(var(--card-hsl) / .6);
   }
   .export-opt:hover{border-color:var(--green);box-shadow:var(--shadow-green)}
 
@@ -387,7 +391,7 @@ const STYLES = `<style>
   label{font-weight:600;letter-spacing:.01em}
   input.f,textarea.f,select.f{
     min-height:46px;
-    background:rgba(255,255,255,.72);
+    background:hsl(var(--card-hsl) / .72);
     -webkit-backdrop-filter:saturate(140%) blur(6px); backdrop-filter:saturate(140%) blur(6px);
     border:1.5px solid var(--glass-line);
     border-radius:13px;
@@ -398,7 +402,7 @@ const STYLES = `<style>
   input.f::placeholder,textarea.f::placeholder{color:hsl(215 16% 42%)}
   input.f:hover,textarea.f:hover,select.f:hover{border-color:hsl(160 30% 78%)}
   input.f:focus,textarea.f:focus,select.f:focus{
-    outline:none; border-color:var(--green); background:#fff;
+    outline:none; border-color:var(--green); background:var(--card);
     box-shadow:0 0 0 4px hsl(160 84% 30% / .16);
   }
   select.f{cursor:pointer}
@@ -407,7 +411,7 @@ const STYLES = `<style>
   .btn{
     min-height:46px; border-radius:14px;
     background:linear-gradient(180deg, hsl(160 84% 34%), var(--green-d));
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.28), 0 8px 20px -8px hsl(160 84% 20% / .6);
+    box-shadow:inset 0 1px 0 hsl(var(--card-hsl) / .28), 0 8px 20px -8px hsl(160 84% 20% / .6);
     transition:transform .12s ease, box-shadow .12s ease, filter .12s ease;
   }
   /* No color here — base .btn:hover already whitens primary buttons, and
@@ -417,21 +421,21 @@ const STYLES = `<style>
   .btn:focus-visible{outline:2px solid var(--green-d); outline-offset:2px}
   .btn.ghost{
     color:var(--green-d);
-    background:rgba(255,255,255,.55);
+    background:hsl(var(--card-hsl) / .55);
     -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
-    border:1.5px solid rgba(255,255,255,.6);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.7), 0 4px 12px -6px hsl(160 40% 20% / .3);
+    border:1.5px solid hsl(var(--card-hsl) / .6);
+    box-shadow:inset 0 1px 0 hsl(var(--card-hsl) / .7), 0 4px 12px -6px hsl(160 40% 20% / .3);
   }
-  .btn.ghost:hover{background:rgba(255,255,255,.72); border-color:var(--accent-line); color:var(--green-d)}
+  .btn.ghost:hover{background:hsl(var(--card-hsl) / .72); border-color:var(--accent-line); color:var(--green-d)}
   .btn.ghost:active{transform:scale(.97)}
   .file-btn{
     min-height:42px; border-radius:12px;
-    background:rgba(255,255,255,.65);
+    background:hsl(var(--card-hsl) / .65);
     -webkit-backdrop-filter:var(--blur-lite); backdrop-filter:var(--blur-lite);
     border:1.5px solid var(--glass-line);
     transition:border-color .16s ease, background .16s ease;
   }
-  .file-btn:hover{border-color:var(--green); background:#fff}
+  .file-btn:hover{border-color:var(--green); background:var(--card)}
   /* "Remove branding" toggle (injected next to the download button). */
   .nobrand-row{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;color:var(--muted);margin-top:14px;cursor:pointer;user-select:none}
   .nobrand-row input{width:18px;height:18px;accent-color:var(--green);cursor:pointer;flex-shrink:0}
@@ -446,9 +450,9 @@ const STYLES = `<style>
   .export-opt.eo-primary:hover{border-color:var(--green);box-shadow:var(--shadow-green)}
   /* Save confirmation toast. */
   /* "Make it with AI" box on the invoice tool. */
-  .ai-box{background:linear-gradient(135deg,var(--accent-bg),rgba(255,255,255,.55));border:1px solid var(--accent-line);border-radius:14px;padding:14px 16px;margin-bottom:18px}
+  .ai-box{background:linear-gradient(135deg,var(--accent-bg),hsl(var(--card-hsl) / .55));border:1px solid var(--accent-line);border-radius:14px;padding:14px 16px;margin-bottom:18px}
   .ai-head{font-size:14px;font-weight:700;color:var(--green-d);margin-bottom:8px}
-  .ai-box textarea.f{background:rgba(255,255,255,.85)}
+  .ai-box textarea.f{background:var(--card)}
 
   /* HARD GUARD: the export node is <div class="card print-doc"> — it carries BOTH
      classes, so force it back to opaque white paper and strip the sheen. After .card. */
@@ -485,15 +489,15 @@ const STYLES = `<style>
 
   /* Fallback: no backdrop-filter (older Firefox/Android) → solid-ish surfaces. */
   @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-    header.site,.tool-switch,.export-sheet{background:rgba(255,255,255,.96)}
-    .card,.tool-card,.rt-card,.export-opt{background:#fff}
-    .chip,.badge{background:#fff}
-    .btn.ghost,.file-btn{background:#fff}
+    header.site,.tool-switch,.export-sheet{background:hsl(var(--card-hsl) / .96)}
+    .card,.tool-card,.rt-card,.export-opt{background:var(--card)}
+    .chip,.badge{background:var(--card)}
+    .btn.ghost,.file-btn{background:var(--card)}
   }
   /* Reduced-transparency (OS accessibility) → near-opaque, no blur. */
   @media (prefers-reduced-transparency:reduce){
     header.site,.tool-switch,.card,.tool-card,.rt-card,.export-sheet,.export-opt,.chip,.badge{
-      background:rgba(255,255,255,.97)!important;
+      background:hsl(var(--card-hsl) / .97)!important;
       -webkit-backdrop-filter:none!important; backdrop-filter:none!important;
     }
   }

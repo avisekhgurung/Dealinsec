@@ -180,7 +180,7 @@ const STYLE = `<style>
   .seg-btn{flex:1;min-height:44px;padding:0 14px;border:0;background:transparent;border-radius:11px;font:inherit;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer;transition:background .16s ease,color .16s ease,box-shadow .16s ease,transform .1s ease}
   .seg-btn:hover{color:var(--ink)}
   .seg-btn:active{transform:scale(.96)}
-  .seg-btn.active{background:#fff;color:var(--green-d);box-shadow:0 2px 6px -1px rgba(16,24,40,.18),inset 0 1px 0 rgba(255,255,255,.9)}
+  .seg-btn.active{background:var(--card);color:var(--green-d);box-shadow:0 2px 6px -1px rgba(16,24,40,.18),inset 0 1px 0 rgba(255,255,255,.9)}
   .rate-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
   .rate-pill{min-height:44px;padding:0 16px;display:inline-flex;align-items:center;border:1.5px solid hsl(215 25% 88% / .7);border-radius:999px;background:rgba(255,255,255,.62);-webkit-backdrop-filter:saturate(160%) blur(12px);backdrop-filter:saturate(160%) blur(12px);font:inherit;font-size:14px;font-weight:700;color:var(--ink);cursor:pointer;transition:transform .1s ease,border-color .16s ease,background .16s ease,box-shadow .16s ease}
   .rate-pill:hover{border-color:hsl(160 35% 76%)}

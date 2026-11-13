@@ -35,11 +35,10 @@ import {
 } from "@shared/permissions";
 import {
   ArrowLeft, Building2, Users, ScrollText, CreditCard, UserPlus, Crown,
-  Mail, RotateCw, Trash2, Loader2, Sparkles, Rocket, Sun, Moon, Monitor, Download, Zap,
+  Mail, RotateCw, Trash2, Loader2, Sparkles, Rocket, Download, Zap,
   SlidersHorizontal, Check, Shield, Pencil, Plus, Plug,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { getThemePref, setThemePref, type ThemePref } from "@/lib/theme";
 import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
 import { pageNumbers } from "@/components/data-table/data-table";
 import { FeedbackCard } from "@/components/feedback-card";
@@ -156,11 +155,6 @@ export default function SettingsPage() {
     typeof window === "undefined" ? null : requestedSettingsTab(window.location.search));
   // Theme is a per-device preference (localStorage), not an account setting.
   const [activityRange, setActivityRange] = useState<DateRange>(ALL_TIME);
-  const [themePref, setThemePrefState] = useState<ThemePref>(() => getThemePref());
-  const chooseTheme = (t: ThemePref) => {
-    setThemePref(t);
-    setThemePrefState(t);
-  };
 
   const myRole = (user as any)?.orgRole as OrgRole | undefined;
   const me = { orgRole: myRole, customPermissions: (user as any)?.customPermissions as string[] | undefined };
@@ -877,44 +871,6 @@ export default function SettingsPage() {
             {/* ── Preferences (per-device) and your data ── */}
             {tab === "preferences" && (
               <>
-                <SettingsSection title="Appearance" description="How DealInSec looks on this device.">
-                  <div className="grid grid-cols-3 gap-3 max-w-md" role="radiogroup" aria-label="Theme">
-                    {([
-                      { key: "light" as ThemePref, label: "Light", desc: "Bright & clean", Icon: Sun },
-                      { key: "dark" as ThemePref, label: "Dark", desc: "Easy on the eyes", Icon: Moon },
-                      { key: "system" as ThemePref, label: "System", desc: "Match your OS", Icon: Monitor },
-                    ]).map(({ key, label, desc, Icon }) => {
-                      const active = themePref === key;
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          role="radio"
-                          aria-checked={active}
-                          onClick={() => chooseTheme(key)}
-                          data-testid={`theme-${key}`}
-                          className={`relative rounded-xl border-2 p-3.5 text-left transition-all ${
-                            active
-                              ? "border-primary bg-primary/[0.06] shadow-sm"
-                              : "border-border hover:border-primary/40 hover:bg-muted/40"
-                          }`}
-                        >
-                          {active && (
-                            <span className="absolute top-2 right-2 flex items-center justify-center w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground">
-                              <Check className="w-3 h-3" strokeWidth={3} />
-                            </span>
-                          )}
-                          <Icon className={`w-5 h-5 mb-2 ${active ? "text-primary" : "text-muted-foreground"}`} />
-                          <p className="text-sm font-semibold">{label}</p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Saved on this device only — teammates and your other devices keep their own choice.
-                  </p>
-                </SettingsSection>
 
                 <AnalyticsConsentCard />
 

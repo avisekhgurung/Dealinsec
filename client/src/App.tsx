@@ -14,7 +14,7 @@ import { InstallPrompt } from "@/components/install-prompt";
 import { ConfirmProvider } from "@/components/confirm-dialog";
 import { UpgradeModalProvider } from "@/components/upgrade-modal";
 import { trackPageView, trackEvent } from "@/lib/analytics";
-import { setAppShell } from "@/lib/theme";
+import { setAppShell, setDocumentLight } from "@/lib/theme";
 import { useAudience } from "@/hooks/use-audience";
 import { useLocation } from "wouter";
 
@@ -304,7 +304,15 @@ function isEmbedded(): boolean {
   try { return typeof window !== "undefined" && window.self !== window.top; } catch { return true; }
 }
 
+/** Pages that ARE a document (formal, white): the quotation preview, the agreement export, an invoice, and the
+ *  public accept / sign links. Everything else is dark (client/src/lib/theme.ts). */
+const isDocumentRoute = (path: string) =>
+  /^\/(d|s)\//.test(path) || /^\/contracts\/\d+\/export/.test(path) || /^\/deals\/[^/]+\/quote/.test(path) || /^\/brand-invoices\/\d+$/.test(path);
+
 function App() {
+  const [docLocation] = useLocation();
+  useEffect(() => { setDocumentLight(isDocumentRoute(docLocation)); }, [docLocation]);
+
   // Documents must print on white whatever theme the screen uses. Overriding
   // 128 CSS variables in @media print would drift; stripping the dark class
   // for the duration of the print flips the entire cascade to light at once.

@@ -605,7 +605,7 @@ const STYLE = `<style>
   .dr-set{border:0;padding:0;margin:16px 0 0}
   .dr-set legend{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:8px;padding:0}
   .dr-kinds{display:flex;gap:10px;flex-wrap:wrap}
-  .dr-radio{display:inline-flex;align-items:center;gap:8px;font-size:14.5px;font-weight:600;background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:10px 14px;cursor:pointer;margin:0}
+  .dr-radio{display:inline-flex;align-items:center;gap:8px;font-size:14.5px;font-weight:600;background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:10px 14px;cursor:pointer;margin:0}
   .dr-radio:has(input:checked){border-color:var(--green);background:var(--accent-bg);color:var(--accent-fg)}
   .dr-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px}
   .dr-examples{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}
@@ -644,7 +644,7 @@ const STYLE = `<style>
   .dr-prose h2{margin-top:30px}
   .dr-prose ol{padding-left:22px;line-height:1.7}
   .dr-prose li{margin-bottom:6px}
-  .dr-prose blockquote{margin:8px 0;padding:10px 14px;border-left:3px solid var(--green);background:#fff;border-radius:0 10px 10px 0;color:var(--ink)}
+  .dr-prose blockquote{margin:8px 0;padding:10px 14px;border-left:3px solid var(--green);background:var(--card);border-radius:0 10px 10px 0;color:var(--ink)}
   .dr-table-wrap{overflow-x:auto}
   .dr-table{width:100%;border-collapse:collapse;font-size:14.5px;background:var(--card);border:1px solid var(--card-line)}
   .dr-table th,.dr-table td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--card-line);vertical-align:top}

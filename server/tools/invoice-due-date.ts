@@ -390,7 +390,7 @@ const STYLE = `<style>
   .dd-chips{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
   .dd-chip{margin:0;cursor:pointer;display:flex}
   .dd-chip input{position:absolute;opacity:0;width:1px;height:1px}
-  .dd-chip span{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.25;font-size:14px;font-weight:600;color:var(--ink);background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:10px 6px}
+  .dd-chip span{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.25;font-size:14px;font-weight:600;color:var(--ink);background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:10px 6px}
   .dd-chip input:checked+span{border-color:var(--green);background:var(--accent-bg);color:var(--accent-fg)}
   .dd-chip input:focus-visible+span{outline:2px solid var(--green);outline-offset:2px}
   .dd-radio{display:flex;gap:10px;align-items:flex-start;font-size:14.5px;font-weight:500;color:var(--ink);margin:8px 0;cursor:pointer}

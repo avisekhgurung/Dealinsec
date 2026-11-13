@@ -79,7 +79,11 @@ export interface CategoryPage {
 
 const STYLES = `<style>
   *,*::before,*::after{box-sizing:border-box}
-  :root{--green:hsl(160 84% 30%);--green-d:hsl(160 84% 23%);--ink:hsl(222 47% 11%);--muted:hsl(215 16% 47%);--line:hsl(215 20% 88%);--card-line:hsl(215 20% 92%);--bg:hsl(210 20% 98%);--card:hsl(0 0% 100%);--accent-bg:hsl(160 60% 95%);--accent-fg:hsl(160 55% 22%);--accent-line:hsl(160 40% 85%)}
+  :root{--green:hsl(160 70% 42%);--green-d:hsl(160 84% 30%);--ink:hsl(210 25% 95%);--muted:hsl(215 15% 66%);--line:hsl(217 22% 21%);--card-line:hsl(217 22% 17%);--bg:hsl(222 40% 7%);--bg-hsl:222 40% 7%;--card:hsl(222 36% 11%);--card-hsl:222 36% 11%;--accent-bg:hsl(160 40% 14%);--accent-fg:hsl(160 60% 70%);--accent-line:hsl(160 35% 26%);color-scheme:dark}
+  /* Paper: a document is formal and white whatever the page around it (13 Nov 2026). */
+  .print-doc,.sample-doc,.paper{--green:hsl(160 84% 30%);--green-d:hsl(160 84% 23%);--ink:hsl(222 47% 11%);--muted:hsl(215 16% 47%);--line:hsl(215 20% 88%);--card-line:hsl(215 20% 92%);--bg:hsl(210 20% 98%);--card:hsl(0 0% 100%);--accent-bg:hsl(160 60% 95%);--accent-fg:hsl(160 55% 22%);--accent-line:hsl(160 40% 85%);--bg-hsl:210 20% 98%;--card-hsl:0 0% 100%;color:var(--ink);color-scheme:light}
+  @media print{:root{--green:hsl(160 84% 30%);--green-d:hsl(160 84% 23%);--ink:hsl(222 47% 11%);--muted:hsl(215 16% 47%);--line:hsl(215 20% 88%);--card-line:hsl(215 20% 92%);--bg:hsl(210 20% 98%);--card:hsl(0 0% 100%);--accent-bg:hsl(160 60% 95%);--accent-fg:hsl(160 55% 22%);--accent-line:hsl(160 40% 85%);--bg-hsl:210 20% 98%;--card-hsl:0 0% 100%}}
+
   html{-webkit-text-size-adjust:100%}
   body{margin:0;font-family:${FONT_STACK_SANS};color:var(--ink);background:var(--bg);line-height:1.65;-webkit-font-smoothing:antialiased}
   a{color:var(--green);text-decoration:none}
@@ -89,18 +93,18 @@ const STYLES = `<style>
   .btn{display:inline-flex;align-items:center;gap:8px;background:var(--green);color:#fff;font-weight:700;padding:13px 24px;border-radius:12px;border:0;cursor:pointer;font-size:15px}
   .btn:hover{background:var(--green-d);text-decoration:none;color:#fff}
   .btn.ghost{background:transparent;color:var(--green);border:1.5px solid var(--line)}
-  .btn.ghost:hover{background:#fff;border-color:var(--green);color:var(--green)}
-  header.site{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  .btn.ghost:hover{background:var(--card);border-color:var(--green);color:var(--green)}
+  header.site{position:sticky;top:0;z-index:20;background:hsl(var(--bg-hsl) / .88);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
   header.site .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
-  .brand{display:inline-flex;align-items:center;gap:9px;font-family:Inter,"Source Sans 3",sans-serif;font-size:19px;font-weight:800;line-height:1;letter-spacing:-.034em;color:#111B22}
+  .brand{display:inline-flex;align-items:center;gap:9px;font-family:Inter,"Source Sans 3",sans-serif;font-size:19px;font-weight:800;line-height:1;letter-spacing:-.034em;color:var(--ink)}
   .brand:hover{text-decoration:none}
   .logo{flex-shrink:0;filter:drop-shadow(0 1px 1px rgba(0,0,0,.05))}
   .brand-accent{background:linear-gradient(180deg,#22D892 0%,#0C8E7B 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#10A584}
   .nav{display:none;align-items:center;gap:2px}
   @media(min-width:820px){.nav{display:flex}}
   .nav a{padding:8px 14px;border-radius:10px;font-size:14px;font-weight:600;color:var(--muted)}
-  .nav a:hover{color:var(--ink);background:hsl(210 20% 93%);text-decoration:none}
-  footer.site{background:#fff;border-top:1px solid var(--line);padding:34px 0;color:var(--muted);font-size:14px}
+  .nav a:hover{color:var(--ink);background:var(--line);text-decoration:none}
+  footer.site{background:var(--card);border-top:1px solid var(--line);padding:34px 0;color:var(--muted);font-size:14px}
   footer.site .links{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px}
   .muted{color:var(--muted)}
 
