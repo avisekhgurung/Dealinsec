@@ -44,7 +44,6 @@ import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components
 import { pageNumbers } from "@/components/data-table/data-table";
 import { FeedbackCard } from "@/components/feedback-card";
 import { DocumentStyleCard } from "@/components/settings/document-style-card";
-import { KnowledgeCard } from "@/components/settings/knowledge-card";
 import { IdealClientCard } from "@/components/settings/ideal-client-card";
 import { IntegrationsPanel } from "@/components/settings/integrations-panel";
 import { PermissionNote, SectionSkeleton, SettingsSection } from "@/components/settings/section-card";
@@ -54,11 +53,9 @@ import {
   SETTINGS_TAB_META, pickSettingsTab, requestedSettingsTab, settingsTabSearch, visibleSettingsTabs,
   type SettingsTab,
 } from "@shared/settings-tabs";
-import { RegionFields } from "@/components/region-fields";
 import { AudiencePicker } from "@/components/audience-picker";
 import { normalizeAudience, type Audience } from "@shared/audience";
-import { getLocaleSettings, type LocaleFields, type LocaleSettings } from "@shared/schema";
-import { sameRegion } from "@shared/region";
+import type { LocaleFields } from "@shared/schema";
 import { DEAL_SUITE_HIDDEN } from "@shared/flags";
 import { trackEvent } from "@/lib/analytics";
 import { consentChoice, openConsentSettings, OPEN_CONSENT_EVENT } from "@/lib/consent";
@@ -116,6 +113,33 @@ const PERMISSION_GROUPS = DEAL_SUITE_HIDDEN
       : ["Quotations", "Agreements", "Invoices"].includes(g.module) ? []
       : [g])
   : PERMISSION_MATRIX;
+
+/** The permission checkboxes, shared by the role editor and the invite dialog. */
+function PermissionChecklist({ selected, onToggle }: { selected: string[]; onToggle: (perm: Permission) => void }) {
+  return (
+    <div className="rounded-xl border border-border/60 overflow-hidden">
+      <div className="px-3.5 py-2.5 bg-muted/50 flex items-center justify-between">
+        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Permissions</span>
+        <span className="text-xs text-muted-foreground tabular-nums">{selected.length} selected</span>
+      </div>
+      <div className="divide-y divide-border/50">
+        {PERMISSION_GROUPS.map((group) => (
+          <div key={group.module} className="px-3.5 py-2.5 flex items-start gap-3">
+            <span className="w-24 lg:w-28 flex-shrink-0 text-sm font-semibold pt-0.5">{group.module}</span>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 flex-1">
+              {group.items.map(({ perm, label }) => (
+                <label key={perm} className="flex items-center gap-1.5 text-sm cursor-pointer select-none" data-testid={`perm-${perm}`}>
+                  <Checkbox checked={selected.includes(perm)} onCheckedChange={() => onToggle(perm)} />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const fmtDate = (d: string | null | undefined, locale: string) =>
   d ? new Date(d).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" }) : "—";
@@ -255,80 +279,36 @@ export default function SettingsPage() {
     onError: (err) => toast({ title: "Couldn't change the work type", description: parseApiError(err).error || "It wasn't changed. Please try again.", variant: "destructive" }),
   });
 
-  // ── Country & currency ──
-  // Stored amounts carry no currency of their own: a deal's value is minor
-  // units of whatever the org's currency currently IS, and the country, locale
-  // and time zone decide how issued documents re-render (tax-ID labels,
-  // governing-law clause, digit grouping, dates). So the WHOLE region locks at
-  // the first record — exactly what PATCH /api/org enforces (orgHasRecords in
-  // server/routes.ts). An earlier version locked only the currency here while
-  // the server refused any region change, so a Save looked possible and was
-  // refused. This screen only avoids offering a control the server would
-  // refuse; the server is the authority.
-  const [regionDraft, setRegionDraft] = useState<LocaleSettings | null>(null);
-  const orgRegion = getLocaleSettings(org);
-  // The owner's own row, which saveRegion keeps in step with the org.
-  const ownRegion = getLocaleSettings(user as LocaleFields | undefined);
-  const { data: orgDeals, isError: dealsCheckFailed } = useQuery<unknown[]>({
-    queryKey: ["/api/deals"],
-    enabled: canEditOrg && tab === "organization",
-  });
-  // Fails closed: if we cannot see the deals, we cannot promise there are none.
-  const regionLock: "checking" | "has-deals" | "unverifiable" | null = !canEditOrg
-    ? null
-    : dealsCheckFailed
-      ? "unverifiable"
-      : !orgDeals
-        ? "checking"
-        : orgDeals.length > 0 ? "has-deals" : null;
-  // A locked region is the stored one, whatever draft was typed before the
-  // deals check answered.
-  const region: LocaleSettings = regionDraft && !regionLock ? regionDraft : orgRegion;
-  // The owner's personal row can have drifted from the org's (a save refused
-  // half-way by an older build wrote the profile first). Comparing against it
-  // too keeps Save available to repair that, even while the region is locked:
-  // re-sending the org's own values is not a change, so the server allows it.
-  const regionUnchanged = sameRegion(region, orgRegion) && (!isOwner || sameRegion(region, ownRegion));
-  const saveRegion = useMutation({
-    mutationFn: async (next: LocaleSettings) => {
-      const fields = { country: next.country, currency: next.currency, locale: next.locale, timezone: next.timezone };
-      // The org FIRST. It is the write that can be refused (REGION_LOCKED), and
-      // the owner's row must not change unless it succeeds: a refused save that
-      // had already moved the owner to GB hid Indian checkout from a paying
-      // customer and had no screen to undo it. The owner's own row is the
-      // issuer profile and drives their personal screens, so it follows. An
-      // Admin changing the workspace's region is not changing where they work.
-      await apiRequest("PATCH", "/api/org", fields);
-      if (isOwner) await apiRequest("PATCH", "/api/profile", fields);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/org"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      setRegionDraft(null);
-      toast({ title: "Country and currency saved" });
-    },
-    onError: (err) => toast({
-      title: "Couldn't save country and currency",
-      description: parseApiError(err).error || "Nothing was changed. Please try again.",
-      variant: "destructive",
-    }),
-  });
-
   // ── Invite flow ──
   const [inviteOpen, setInviteOpen] = useState(false);
   const [seatDialogOpen, setSeatDialogOpen] = useState(false);
   const [seatMessage, setSeatMessage] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<string>("");
+  // "Create a new role" inside the invite: the Owner names it and ticks permissions right here.
+  const NEW_ROLE = "__new__";
+  const [newRoleName, setNewRoleName] = useState("");
+  const [newRolePerms, setNewRolePerms] = useState<string[]>([]);
+  const toggleNewRolePerm = (perm: Permission) =>
+    setNewRolePerms((prev) => (prev.includes(perm) ? prev.filter((x) => x !== perm) : [...prev, perm]));
   const sendInvite = useMutation({
-    mutationFn: async () =>
-      (await apiRequest("POST", "/api/org/invitations", {
+    mutationFn: async () => {
+      let role = inviteRole;
+      if (role === NEW_ROLE) {
+        const created = await (await apiRequest("POST", "/api/org/roles", { name: newRoleName.trim(), permissions: newRolePerms })).json();
+        role = `custom:${created.id}`;
+        // Keep the new role chosen if the invitation itself is refused, so a retry does not try to create it twice.
+        setInviteRole(role);
+        queryClient.invalidateQueries({ queryKey: ["/api/org/roles"] });
+      }
+      return (await apiRequest("POST", "/api/org/invitations", {
         email: inviteEmail.trim(),
-        ...(inviteRole.startsWith("custom:")
-          ? { customRoleId: inviteRole.slice(7) }
-          : { orgRole: inviteRole }),
-      })).json(),
+        ...(role.startsWith("custom:") ? { customRoleId: role.slice(7) } : { orgRole: role }),
+      })).json();
+    },
     onSuccess: () => {
+      setNewRoleName("");
+      setNewRolePerms([]);
       queryClient.invalidateQueries({ queryKey: ["/api/org/invitations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/org"] });
       setInviteOpen(false);
@@ -547,60 +527,6 @@ export default function SettingsPage() {
                         </>
                       )}
                     </SettingsSection>
-
-                    <SettingsSection
-                      title={<>Country &amp; currency</>}
-                      description={DEAL_SUITE_HIDDEN
-                        ? "Where you work, and the currency and time zone DealInSec uses for you."
-                        : "What your quotations, agreements and invoices are issued in."}
-                    >
-                      {orgLoading ? (
-                        <Skeleton className="h-32 w-full rounded-xl" />
-                      ) : (
-                        <div className="space-y-4 max-w-md">
-                          {/* Keyed on the org so the currency's "picked by hand"
-                              memory never carries over from another workspace. */}
-                          <RegionFields
-                            key={org?.id}
-                            value={region}
-                            onChange={setRegionDraft}
-                            disabled={!canEditOrg || saveRegion.isPending || regionLock !== null}
-                            showTimeZone
-                            idPrefix="org-region"
-                          />
-                          {regionLock === "has-deals" && (
-                            <p className="text-xs text-muted-foreground" data-testid="region-locked">
-                              Fixed once your first deal exists, so everything already quoted, signed and invoiced keeps
-                              printing exactly as it was issued. To change it, email support@dealinsec.com.
-                            </p>
-                          )}
-                          {regionLock === "unverifiable" && (
-                            <p className="text-xs text-muted-foreground" data-testid="region-locked">
-                              We couldn't check whether this workspace has deals, so the country and currency stay locked for now. Refresh the page to try again.
-                            </p>
-                          )}
-                          {canEditOrg && isOwner && regionLock !== null && regionLock !== "checking" && !regionUnchanged && (
-                            <p className="text-xs text-muted-foreground" data-testid="region-owner-drift">
-                              Your own profile doesn't match this workspace's country and currency. Save to bring it back in line —
-                              the workspace itself won't change.
-                            </p>
-                          )}
-                          {canEditOrg ? (
-                            <Button
-                              onClick={() => saveRegion.mutate(region)}
-                              disabled={saveRegion.isPending || regionLock === "checking" || regionUnchanged}
-                              className="gradient-btn text-white"
-                              data-testid="button-save-region"
-                            >
-                              {saveRegion.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                              Save changes
-                            </Button>
-                          ) : (
-                            <PermissionNote>Only the Owner or an Admin can change this.</PermissionNote>
-                          )}
-                        </div>
-                      )}
-                    </SettingsSection>
                   </>
                 )}
 
@@ -609,8 +535,6 @@ export default function SettingsPage() {
 
                 {/* The saved ideal client and offer: same record and dialog as the Leads page, made findable here. */}
                 <IdealClientCard canEdit={memberCan(user as any, "deals.create")} />
-
-                <KnowledgeCard canEdit={memberCan(user as any, "deals.create")} />
               </>
             )}
 
@@ -625,10 +549,10 @@ export default function SettingsPage() {
 
             {tab === "team" && org && isSolo && (
               <SettingsSection
-                title="Working solo"
+                title="Team"
                 icon={Users}
                 testId="team-solo"
-                description="You don't need a team to use DealInSec. When you bring someone in — an assistant, a subcontractor or your accountant — they get their own login and a role that decides what they can do. Billing and your plan stay with you as the Owner."
+                description="Invite people and choose what each can do."
                 action={canInvite ? (
                   <Button className="gradient-btn text-white" onClick={openInvite} data-testid="button-invite-member">
                     <UserPlus className="w-4 h-4 mr-2" />
@@ -636,15 +560,6 @@ export default function SettingsPage() {
                   </Button>
                 ) : undefined}
               >
-                <ul className="text-sm text-muted-foreground space-y-1.5 max-w-xl list-disc pl-5">
-                  {DEAL_SUITE_HIDDEN ? (
-                    <li>Each person gets their own login and a role that decides what they can see and do — searches, leads and outreach included.</li>
-                  ) : (<>
-                  <li>Give your accountant the <strong className="text-foreground">Accounts</strong> role: they raise invoices and track payments, but can't create or edit deals.</li>
-                  <li>Give an assistant the <strong className="text-foreground">Sales</strong> role: they create deals and quotations, but can't touch invoices.</li>
-                  </>)}
-                  <li>Pro includes up to 5 people, you included.</li>
-                </ul>
                 {!canInvite && <PermissionNote>Only the Owner or an Admin can invite people.</PermissionNote>}
               </SettingsSection>
             )}
@@ -1152,7 +1067,7 @@ export default function SettingsPage() {
 
       {/* ── Invite dialog ── */}
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-        <DialogContent className="max-w-sm" data-testid="invite-dialog">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" data-testid="invite-dialog">
           <DialogHeader>
             <DialogTitle>Invite a team member</DialogTitle>
             <DialogDescription>They'll get an email with a link to join {org?.name}.</DialogDescription>
@@ -1183,12 +1098,29 @@ export default function SettingsPage() {
                       <span className="text-muted-foreground text-xs"> — {r.permissions.length} permission{r.permissions.length !== 1 ? "s" : ""}</span>
                     </SelectItem>
                   ))}
+                  {isOwner && (
+                    <SelectItem value={NEW_ROLE} data-testid="invite-role-new">
+                      <span className="font-semibold">+ Create a new role</span>
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
+            {inviteRole === NEW_ROLE && (
+              <div className="space-y-3" data-testid="invite-new-role">
+                <Input
+                  placeholder="Role name, e.g. Junior sales"
+                  value={newRoleName}
+                  maxLength={40}
+                  onChange={(e) => setNewRoleName(e.target.value)}
+                  data-testid="input-invite-new-role-name"
+                />
+                <PermissionChecklist selected={newRolePerms} onToggle={toggleNewRolePerm} />
+              </div>
+            )}
             <Button
               className="w-full gradient-btn text-white"
-              disabled={sendInvite.isPending || !inviteEmail.trim() || !inviteRole}
+              disabled={sendInvite.isPending || !inviteEmail.trim() || !inviteRole || (inviteRole === NEW_ROLE && newRoleName.trim().length < 2)}
               onClick={() => sendInvite.mutate()}
               data-testid="button-send-invite"
             >
@@ -1222,34 +1154,10 @@ export default function SettingsPage() {
               />
             </div>
 
-            <div className="rounded-xl border border-border/60 overflow-hidden">
-              <div className="px-3.5 py-2.5 bg-muted/50 flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Permissions</span>
-                <span className="text-xs text-muted-foreground tabular-nums">{rolePerms.length} selected</span>
-              </div>
-              <div className="divide-y divide-border/50">
-                {PERMISSION_GROUPS.map((group) => (
-                  <div key={group.module} className="px-3.5 py-2.5 flex items-start gap-3">
-                    <span className="w-24 lg:w-28 flex-shrink-0 text-sm font-semibold pt-0.5">{group.module}</span>
-                    <div className="flex flex-wrap gap-x-4 gap-y-2 flex-1">
-                      {group.items.map(({ perm, label }) => (
-                        <label key={perm} className="flex items-center gap-1.5 text-sm cursor-pointer select-none" data-testid={`perm-${perm}`}>
-                          <Checkbox
-                            checked={rolePerms.includes(perm)}
-                            onCheckedChange={() => togglePerm(perm)}
-                          />
-                          {label}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <p className="px-3.5 py-2.5 text-[11px] text-muted-foreground bg-muted/30 border-t border-border/50">
-                Every active member can <b>view</b> the workspace's records. Billing and
-                deleting the workspace always stay with the Owner.
-              </p>
-            </div>
+            <PermissionChecklist selected={rolePerms} onToggle={togglePerm} />
+            <p className="text-[11px] text-muted-foreground">
+              Every active member can <b>view</b> the workspace's records. Billing and deleting the workspace always stay with the Owner.
+            </p>
 
             <Button
               className="w-full gradient-btn text-white"

@@ -22,7 +22,6 @@ import { OutreachOverview } from "@/components/studio/outreach-overview";
 import { SegmentedTabs } from "@/components/outbound/segmented-tabs";
 import { SalesFunnel } from "@/components/outbound/sales-funnel";
 import { StrategyStats } from "@/components/outbound/strategy-stats";
-import { OutreachInbox } from "@/components/outbound/outreach-inbox";
 import { SocialIntent } from "@/components/outbound/social-intent";
 import { OUTBOUND_USAGE_URL, UsageNote, searchBlockedReason, useOutboundUsage } from "@/components/outbound/usage-note";
 import { LocalSearch, type LocalFields } from "@/components/outbound/local-search";
@@ -331,8 +330,9 @@ export default function OutboundPage() {
   // ?run=<id>: open that search (the agent's "Open in Client Radar" link).
   const runParam = new URLSearchParams(search).get("run");
   useEffect(() => { if (runParam) setRunId(runParam); }, [runParam]);
-  const view = viewParam === "prospects" || viewParam === "outreach" || viewParam === "campaigns" || viewParam === "inbox" || viewParam === "results" || viewParam === "social" ? viewParam : "searches";
-  const setView = (v: "prospects" | "searches" | "social" | "outreach" | "campaigns" | "inbox" | "results") => navigate(v === "searches" ? location : `${location}?view=${v}`, { replace: true });
+  // The Inbox tab is gone; older links to ?view=inbox (reports, activity notices) land on Outreach instead.
+  const view = viewParam === "inbox" ? "outreach" : viewParam === "prospects" || viewParam === "outreach" || viewParam === "campaigns" || viewParam === "results" || viewParam === "social" ? viewParam : "searches";
+  const setView = (v: "prospects" | "searches" | "social" | "outreach" | "campaigns" | "results") => navigate(v === "searches" ? location : `${location}?view=${v}`, { replace: true });
   // Client Radar opened (counts only; which view, never a search or a company).
   useEffect(() => { trackEvent("outbound_opened", { view }); }, []);
   // Arriving by a link to a tab ("Review in Outreach", "Open the Inbox"): land on the tabs. On a phone they sit a long
@@ -497,7 +497,7 @@ export default function OutboundPage() {
   const listed = runs.data?.runs.find((r) => r.id === runId) ?? null;
   const flowRun = view === "searches" ? runCache.data?.run ?? listed : listed ?? runCache.data?.run ?? null;
   const flow = flowState({
-    view: view === "inbox" || view === "results" || view === "campaigns" ? "outreach" : view === "social" ? "searches" : view, // the inbox is the outreach step's other half; results come after it; Social Intent is another way of finding
+    view: view === "results" || view === "campaigns" ? "outreach" : view === "social" ? "searches" : view, // the inbox is the outreach step's other half; results come after it; Social Intent is another way of finding
     composing: parse.isPending ? "reading" : parsed ? "confirming" : null,
     run: flowRun ? { status: flowRun.status, stage: flowRun.stage } : null,
     results: runCache.data ? splitProspects(runCache.data.prospects)[0].length : null,
@@ -663,12 +663,11 @@ export default function OutboundPage() {
             )}
 
             <SegmentedTabs label={VIEWS_LABEL} value={view} onChange={setView} scroll className="scroll-mt-28"
-              tabs={[{ value: "searches", label: "Searches", testId: "view-searches" }, { value: "social", label: "Social Intent", testId: "view-social" }, { value: "prospects", label: "All prospects", testId: "view-prospects" }, { value: "outreach", label: "Outreach", testId: "view-outreach" }, { value: "campaigns", label: "Campaigns", testId: "view-campaigns" }, { value: "inbox", label: "Inbox", testId: "view-inbox" }, { value: "results", label: "Results", testId: "view-results" }]} />
+              tabs={[{ value: "searches", label: "Searches", testId: "view-searches" }, { value: "social", label: "Social Intent", testId: "view-social" }, { value: "prospects", label: "All prospects", testId: "view-prospects" }, { value: "outreach", label: "Outreach", testId: "view-outreach" }, { value: "campaigns", label: "Campaigns", testId: "view-campaigns" }, { value: "results", label: "Results", testId: "view-results" }]} />
 
             {view === "social" ? <SocialIntent canEdit={canEdit} />
               : view === "results" ? <div className="space-y-4"><PlanUsage /><ResultsOverview /><SalesFunnel /><StrategyStats /></div>
               : view === "campaigns" ? <Campaigns canEdit={canEdit} />
-              : view === "inbox" ? <OutreachInbox />
               : view === "outreach" ? <div className="space-y-6"><OutreachOverview /><OutreachQueue canEdit={canEdit} onShowReady={() => navigate(`${location}?view=prospects&readiness=ready`, { replace: true })} /></div>
               : view === "prospects" ? <ProspectWorkspace canExport={canEdit} onOpen={(r, focus) => setOpen({ id: r.id, runId: r.latestRunId, focus })} onPrepared={() => setView("outreach")} /> : <>
             {runs.data && runs.data.runs.length > 1 && (

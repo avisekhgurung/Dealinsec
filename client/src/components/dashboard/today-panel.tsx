@@ -15,7 +15,7 @@ import { Link } from "wouter";
 import { motion } from "framer-motion";
 import {
   AlertCircle, AlertTriangle, ArrowRight, CalendarClock, CalendarDays, CheckCircle2, ChevronDown, Clock, FileSignature,
-  FileText, Receipt, ReceiptText, RotateCw, Send, ShieldAlert, type LucideIcon,
+  FileText, MessageSquareReply, Receipt, ReceiptText, RotateCw, Send, ShieldAlert, UserPlus, type LucideIcon,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAudience } from "@/hooks/use-audience";
 import { useMoney } from "@/hooks/use-locale";
 import { trackEvent } from "@/lib/analytics";
-import { FOLLOWUPS_URL, OUTREACH_QUEUE_URL, type FollowUps } from "@/lib/leads";
+import { FOLLOWUPS_URL, OUTREACH_QUEUE_URL, listUrl as leadListUrl, type FollowUps, type LeadList } from "@/lib/leads";
 import { fadeUp, stagger, staggerItem, useCalmMotion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { canSeeModule } from "@shared/permissions";
@@ -51,6 +51,8 @@ const unavailable = (err: unknown) => {
 };
 
 const KIND_ICON: Record<TodayKind, LucideIcon> = {
+  replied_leads: MessageSquareReply,
+  new_leads: UserPlus,
   overdue_invoices: Receipt,
   follow_ups: CalendarClock,
   awaiting_signature: FileSignature,
@@ -158,7 +160,10 @@ export function TodayPanel({ hideWhenEmpty = false }: { hideWhenEmpty?: boolean 
   // Protection Check over pending deals: the rule-based briefing (same cache as the agent's briefing).
   const briefing = useQuery<{ protection?: { withIssues: number; important: number } }>({ queryKey: ["/api/copilot/briefing"], enabled: seeDeals, staleTime: 60_000 });
 
-  const sources = [invoices, contracts, quotes, followUps, outreach, briefing];
+  // The lead list's counts: the same cache entry as the dashboard's lead strip, so no extra request.
+  const leadList = useQuery<LeadList>({ queryKey: [leadListUrl({})], enabled: seeDeals, retry: false });
+
+  const sources = [invoices, contracts, quotes, followUps, outreach, briefing, leadList];
   if (!user) return null;
   if (sources.some((q) => q.isLoading)) return hideWhenEmpty ? null : <TodaySkeleton />;
 
@@ -169,6 +174,7 @@ export function TodayPanel({ hideWhenEmpty = false }: { hideWhenEmpty?: boolean 
     outbound: seeDeals && !unavailable(outreach.error),
     quotations: canSeeModule(user as any, "quotations") && !unavailable(quotes.error),
     deals: seeDeals && !unavailable(briefing.error),
+    leadPipeline: seeDeals && !unavailable(leadList.error),
   };
   const ok = <T,>(q: { isError: boolean; data?: T }) => (q.isError || q.data == null ? null : q.data);
   const inv = ok(invoices), con = ok(contracts), quo = ok(quotes), fu = ok(followUps), out = ok(outreach);
@@ -189,6 +195,7 @@ export function TodayPanel({ hideWhenEmpty = false }: { hideWhenEmpty?: boolean 
         id: r.message.id, status: r.message.status, leadId: r.lead.id, companyName: r.lead.companyName,
         blocked: !!r.suppressed || !!r.lead.doNotContact,
       })),
+      leadCounts: leadList.isError || !leadList.data ? null : (leadList.data.counts ?? {}),
       protection: briefing.isError || !briefing.data ? null : (briefing.data.protection ?? { withIssues: 0, important: 0 }),
       quotations: quo && quo.map((q) => ({
         id: q.id, dealId: q.dealId, brandName: q.deal?.brandName ?? "Your client", createdAt: q.createdAt,

@@ -1,17 +1,14 @@
 /**
- * Settings → Integrations. Gmail and WhatsApp Business (whatsapp-card.tsx, shown only where WhatsApp sending is switched
- * on) are real connections; GmailCard decides for itself what to show, and this panel only
+ * Settings → Integrations: Gmail only. GmailCard decides for itself what to show, and this panel only
  * fills the gaps it leaves (loading, a failed load, or Gmail not switched on for this workspace), reading the same
- * GET /api/integrations/gmail answer, so it never says "connected" unless the server does. The other cards are
- * integrations that do NOT exist: no connect button, no dates, no promises.
+ * GET /api/integrations/gmail answer, so it never says "connected" unless the server does.
  */
-import { AtSign, Inbox, Linkedin, Mail, type LucideIcon } from "lucide-react";
+import { Mail, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LoadError } from "@/components/load-error";
 import { GmailCard } from "@/components/settings/gmail-card";
-import { WhatsappCard } from "@/components/settings/whatsapp-card";
 import { SettingsSection } from "@/components/settings/section-card";
 import { useGmailStatus } from "@/lib/gmail";
 
@@ -64,32 +61,6 @@ export function IntegrationsPanel() {
           testId="gmail-unavailable"
         />
       )}
-
-      <WhatsappCard />
-
-      <div className="grid gap-4 xl:grid-cols-3">
-        <UnavailableIntegration
-          name="Microsoft 365 / Outlook"
-          icon={Inbox}
-          status="Not available yet"
-          description="Connecting Microsoft 365 or Outlook isn't available yet."
-          testId="integration-outlook"
-        />
-        <UnavailableIntegration
-          name="LinkedIn"
-          icon={Linkedin}
-          status="Drafts only"
-          description="LinkedIn doesn't let apps like DealInSec send messages or connection requests. DealInSec writes the note on the lead; you send it on LinkedIn yourself."
-          testId="integration-linkedin"
-        />
-        <UnavailableIntegration
-          name="X"
-          icon={AtSign}
-          status="Drafts only"
-          description="Sending X Direct Messages needs X's paid API access, which DealInSec doesn't have. DealInSec writes the message; you send it on X yourself."
-          testId="integration-x"
-        />
-      </div>
     </>
   );
 }

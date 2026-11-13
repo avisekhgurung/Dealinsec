@@ -23,7 +23,6 @@ import { useAgent } from "@/hooks/use-agent";
 import { cn } from "@/lib/utils";
 import { BOTS, BOT_IDENTITY, BOT_STATUS_LABEL, isBot, isTerminal, type Bot } from "@shared/ai-league";
 import { leagueCall, leagueEndpoints, refreshLeague, runUrl, useApprovals, useLeagueStatus, useRoster, useRuns, when, type BotCard, type RunView } from "@/lib/ai-league";
-import { NEST_TEAM_IMAGE } from "@/lib/plush";
 import { playChirp, useNestSound } from "@/lib/chirp-player";
 import { VoiceCall } from "@/components/agent/voice-call";
 import { voiceCallSupported } from "@/hooks/use-voice-call";
@@ -197,13 +196,11 @@ function NestWelcome() {
   const hide = () => { setHidden(true); try { localStorage.setItem(WELCOME_KEY, "1"); } catch { /* not stored */ } };
   if (hidden) return null;
   return (
-    <section className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-[#fbf4ec] via-card to-card dark:from-amber-950/20" aria-labelledby="nest-welcome-h" data-testid="nest-welcome">
+    <section className="relative overflow-hidden rounded-2xl border bg-card" aria-labelledby="nest-welcome-h" data-testid="nest-welcome">
       <button type="button" onClick={hide} className="absolute right-2 top-2 z-10 rounded-full bg-background/85 px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur hover:text-foreground" data-testid="nest-welcome-hide">Hide</button>
-      <div className="grid items-center gap-0 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <img {...NEST_TEAM_IMAGE} sizes="(min-width: 768px) 560px, 100vw" loading="eager" decoding="async" draggable={false}
-          className="aspect-[3/2] h-auto w-full select-none object-cover md:max-h-[300px]" />
+      <div className="grid items-center gap-0">
         <div className="space-y-3 p-4 sm:p-5">
-          <div>
+          <div className="pr-14">
             <h2 id="nest-welcome-h" className="text-lg font-bold tracking-tight">Welcome to The Nest <span aria-hidden>🪺</span></h2>
             <p className="text-sm text-muted-foreground">Your AI team works in the background and asks before anything that matters.{agentOn === true && <> Need a quick answer instead? <Link href="/agent" className="font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400" data-testid="league-ask-agent">Ask DealInSec</Link>.</>}</p>
           </div>
@@ -272,7 +269,7 @@ function CoworkerCard({ card, onTask, onOpenRun }: { card: BotCard; onTask: () =
         {card.nextSchedule && <p className="px-2.5 text-muted-foreground">Next scheduled: {when(card.nextSchedule)}</p>}
       </div>
       <div className="mt-auto flex gap-2">
-        <Button asChild className={cn("h-10 flex-1 text-white hover:opacity-90", id.accent.bg)}><Link href={`/ai-league/${card.bot}`} data-testid={`open-chat-${card.bot}`}>Open chat</Link></Button>
+        <Button asChild className={cn("h-10 flex-1 border-transparent text-white hover:opacity-90", id.accent.bg)}><Link href={`/ai-league/${card.bot}`} data-testid={`open-chat-${card.bot}`}>Open chat</Link></Button>
         <Button variant="outline" className="h-10" onClick={onTask} data-testid={`quick-task-${card.bot}`}><Play className="mr-1.5 h-3.5 w-3.5" />{card.bot === "zee" ? "Brief me" : "Start a task"}</Button>
       </div>
     </article>
@@ -396,13 +393,13 @@ function CoworkerChat({ bot }: { bot: Bot }) {
             </div>
             <Button size="sm" variant="outline" className="h-9 xl:hidden" onClick={() => setTasksOpen(true)} data-testid="open-tasks"><ListChecks className="mr-1.5 h-4 w-4" />Tasks{active ? " ·1" : ""}</Button>
             {canCall && (
-              <Button size="sm" className={cn("h-9 text-white", id.accent.bg)} onClick={() => setCallOpen(true)} aria-label={`Talk to ${id.name}: a voice call`} title={`Talk to ${id.name} in ${id.name}'s voice`} data-testid="chat-call">
+              <Button size="sm" className={cn("h-9 border-transparent text-white", id.accent.bg)} onClick={() => setCallOpen(true)} aria-label={`Talk to ${id.name}: a voice call`} title={`Talk to ${id.name} in ${id.name}'s voice`} data-testid="chat-call">
                 <AudioLines className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Talk</span>
               </Button>
             )}
             <SoundSwitch compact />
             <Button size="sm" variant="outline" className="hidden h-9 sm:inline-flex" onClick={() => setHuddle(true)} data-testid="chat-start-huddle"><MessagesSquare className="mr-1.5 h-4 w-4" />Huddle</Button>
-            <Button size="sm" className={cn("hidden h-9 text-white sm:inline-flex", id.accent.bg)} onClick={() => setDialog(true)} data-testid="chat-start-task"><Play className="mr-1.5 h-3.5 w-3.5" />{bot === "zee" ? "Brief me" : "Start a task"}</Button>
+            <Button size="sm" className={cn("hidden h-9 border-transparent text-white sm:inline-flex", id.accent.bg)} onClick={() => setDialog(true)} data-testid="chat-start-task"><Play className="mr-1.5 h-3.5 w-3.5" />{bot === "zee" ? "Brief me" : "Start a task"}</Button>
           </header>
           <div className="relative flex min-h-0 flex-1 flex-col">
             {empty ? (

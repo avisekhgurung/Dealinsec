@@ -111,6 +111,23 @@ function SetupStepper({ steps, onStepClick }: {
   );
 }
 
+/** Marks a field as needed or not, so people can see what the deal suite actually requires. */
+function Need({ kind }: { kind: "required" | "optional" }) {
+  return kind === "required"
+    ? <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">Required</span>
+    : <span className="ml-1.5 text-xs font-normal text-muted-foreground">(optional)</span>;
+}
+
+/** A labelled group of profile data: personal data and deal-suite data are kept apart. */
+function GroupHeading({ title, note, className = "" }: { title: string; note: string; className?: string }) {
+  return (
+    <div className={className}>
+      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</h3>
+      <p className="text-xs text-muted-foreground mt-0.5">{note}</p>
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const { user } = useAuth();
   const { locale } = useLocale();
@@ -570,11 +587,14 @@ export default function ProfilePage() {
             <section id="profile-section-identity" className="scroll-mt-24 space-y-4">
               <div className="flex items-center gap-2 pt-1">
                 <User className="h-4 w-4 text-primary" />
-                <h4 className="font-semibold text-sm">Personal</h4>
+                <div>
+                  <h4 className="font-semibold text-sm">Personal data</h4>
+                  <p className="text-xs text-muted-foreground">Your own details.</p>
+                </div>
               </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="firstName">First name</Label>
+                <Label htmlFor="firstName">First name<Need kind="required" /></Label>
                 <Input
                   id="firstName"
                   value={firstName}
@@ -583,7 +603,7 @@ export default function ProfilePage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last name</Label>
+                <Label htmlFor="lastName">Last name<Need kind="optional" /></Label>
                 <Input
                   id="lastName"
                   value={lastName}
@@ -594,7 +614,7 @@ export default function ProfilePage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone number</Label>
+              <Label htmlFor="phone">Phone number<Need kind="required" /></Label>
               <Input
                 id="phone"
                 type="tel"
@@ -609,6 +629,9 @@ export default function ProfilePage() {
             {/* Tax, bank, signature and stamp exist only for the document suite —
                 hidden with it. The stored values are left untouched. */}
             {!DEAL_SUITE_HIDDEN && (<>
+            <div className="border-t border-border/60 pt-5">
+              <GroupHeading title="Deal suite data" note="Only needed for quotations, agreements and invoices. Not needed for finding clients or outreach." />
+            </div>
             <section id="profile-section-business" className="scroll-mt-24 space-y-4">
               <div className="flex items-center gap-2 pt-1">
                 <Building className="h-4 w-4 text-primary" />
@@ -623,7 +646,7 @@ export default function ProfilePage() {
               </div>
             {isIndia && (
             <div className="space-y-2">
-              <Label htmlFor="panNumber">PAN</Label>
+              <Label htmlFor="panNumber">PAN<Need kind="required" /></Label>
               <Input
                 id="panNumber"
                 value={panNumber}
@@ -637,7 +660,7 @@ export default function ProfilePage() {
 
             {isIndia ? (
             <div className="space-y-2">
-              <Label htmlFor="gstNumber">GSTIN <span className="font-normal text-muted-foreground">(optional)</span></Label>
+              <Label htmlFor="gstNumber">GSTIN<Need kind="optional" /></Label>
               <Input
                 id="gstNumber"
                 value={gstNumber}
@@ -653,7 +676,7 @@ export default function ProfilePage() {
             // country's number short. Case is left as typed.
             <div className="space-y-2">
               <Label htmlFor="gstNumber">
-                {taxIdLabel(docCountry)} <span className="font-normal text-muted-foreground">(optional)</span>
+                {taxIdLabel(docCountry)}<Need kind="optional" />
               </Label>
               <Input
                 id="gstNumber"
@@ -665,7 +688,7 @@ export default function ProfilePage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="billingAddress">Billing address</Label>
+              <Label htmlFor="billingAddress">Billing address<Need kind="required" /></Label>
               <Textarea
                 id="billingAddress"
                 value={billingAddress}
@@ -689,7 +712,7 @@ export default function ProfilePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="accountHolderName">Account holder name</Label>
+                <Label htmlFor="accountHolderName">Account holder name<Need kind="required" /></Label>
                 <Input
                   id="accountHolderName"
                   value={accountHolderName}
@@ -700,7 +723,7 @@ export default function ProfilePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="accountNumber">Account number</Label>
+                <Label htmlFor="accountNumber">Account number<Need kind="required" /></Label>
                 {isIndia ? (
                 <Input
                   id="accountNumber"
@@ -726,7 +749,7 @@ export default function ProfilePage() {
               <div className="grid grid-cols-2 gap-3">
                 {isIndia ? (
                 <div className="space-y-2">
-                  <Label htmlFor="ifscCode">IFSC</Label>
+                  <Label htmlFor="ifscCode">IFSC<Need kind="required" /></Label>
                   <Input
                     id="ifscCode"
                     value={ifscCode}
@@ -740,7 +763,7 @@ export default function ProfilePage() {
                 // Same stored field. No IFSC placeholder and no 11-character
                 // cap, which would cut an IBAN off mid-number.
                 <div className="space-y-2">
-                  <Label htmlFor="ifscCode">{routingLabel(docCountry)}</Label>
+                  <Label htmlFor="ifscCode">{routingLabel(docCountry)}<Need kind="required" /></Label>
                   <Input
                     id="ifscCode"
                     value={ifscCode}
@@ -755,7 +778,7 @@ export default function ProfilePage() {
                 </div>
                 )}
                 <div className="space-y-2">
-                  <Label htmlFor="bankName">Bank name</Label>
+                  <Label htmlFor="bankName">Bank name<Need kind="optional" /></Label>
                   <Input
                     id="bankName"
                     value={bankName}
@@ -771,7 +794,7 @@ export default function ProfilePage() {
               <div className="flex items-center gap-2 pt-1">
                 <PenTool className="h-4 w-4 text-primary" />
                 <div>
-                  <h4 className="font-semibold text-sm">Digital signature</h4>
+                  <h4 className="font-semibold text-sm">Digital signature<Need kind="required" /></h4>
                   <p className="text-xs text-muted-foreground">Added automatically to every agreement you create.</p>
                 </div>
               </div>
@@ -888,6 +911,7 @@ export default function ProfilePage() {
         ) : (
           /* ---- View Mode: Card Grid (stack on mobile, 2-col on desktop) ---- */
           <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-5 lg:auto-rows-min">
+            <GroupHeading className="lg:col-span-2" title="Personal data" note="Your own details and plan. Not tied to documents." />
             {/* Personal Info Card */}
             <div className="glass-card rounded-2xl p-5 border-0" style={{ background: "linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.8) 100%)" }}>
               <div className="flex items-center gap-2 mb-4">
@@ -925,6 +949,64 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {/* Plan card — plan only; deal limits are enforced server-side
+                and explained by the upgrade modal, not counted in the UI.
+                Pro wears the brand's own pairing (emerald tile + gold seal,
+                like the logo); trial is the same family so it FEELS like Pro
+                but reads distinctly; free/lapsed goes neutral graphite. Paid
+                Pro is checked first — a Pro buyer mid-trial sees "Pro". */}
+            <div
+              className="rounded-2xl p-5 border-0 relative overflow-hidden"
+              style={{
+                background: hasActivePro(user)
+                  ? "linear-gradient(135deg, hsl(160 84% 14%) 0%, hsl(160 84% 22%) 50%, hsl(174 77% 26%) 100%)"
+                  : hasActiveTrial(user)
+                    ? "linear-gradient(135deg, hsl(160 84% 22%) 0%, hsl(160 84% 30%) 50%, hsl(174 77% 36%) 100%)"
+                    : "linear-gradient(135deg, hsl(215 28% 17%) 0%, hsl(215 25% 24%) 50%, hsl(210 20% 30%) 100%)",
+              }}
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/10 -mr-10 -mt-10" />
+              <div className="absolute bottom-0 left-0 w-20 h-20 rounded-full bg-white/5 -ml-6 -mb-6" />
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-3">
+                  {hasActivePro(user)
+                    ? <Crown className="h-4 w-4 text-amber-400" />
+                    : <Sparkles className="h-4 w-4 text-white/80" />}
+                  <h3 className="font-semibold text-white/90">Your plan</h3>
+                </div>
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p className="text-3xl font-bold text-white" data-testid="text-plan">
+                      {hasActivePro(user) ? "DealInSec Pro" : hasActiveTrial(user) ? "Pro trial" : "Free"}
+                    </p>
+                    <p className="text-sm text-white/60 mt-1">
+                      {hasActivePro(user)
+                        ? `${DEAL_SUITE_HIDDEN ? "Everything unlocked" : "Unlimited workflow"}${user?.planExpiresAt ? ` · until ${new Date(user.planExpiresAt).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}` : ""}`
+                        : hasActiveTrial(user)
+                          ? `${getTrialDaysLeft(user) === 1 ? "Last day" : `${getTrialDaysLeft(user)} days left`} · everything unlocked`
+                          : DEAL_SUITE_HIDDEN
+                            ? "Upgrade for more AI searches, drafts and coworker tasks"
+                            : "Deals & quotations · upgrade for agreements and invoices"}
+                    </p>
+                  </div>
+                  <Link href="/pricing">
+                    <Button
+                      size="sm"
+                      className="bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-sm"
+                      data-testid="button-upgrade"
+                    >
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      {hasActivePro(user) ? "Manage plan" : "Upgrade"}
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            {!DEAL_SUITE_HIDDEN && (
+              <GroupHeading className="lg:col-span-2 pt-2" title="Deal suite data" note="Only needed for quotations, agreements and invoices. Not needed for finding clients or outreach." />
+            )}
+
             {/* Business, bank, signature and stamp cards belong to the document
                 suite — hidden with it, values untouched. */}
             {!DEAL_SUITE_HIDDEN && (<>
@@ -933,6 +1015,11 @@ export default function ProfilePage() {
               <div className="flex items-center gap-2 mb-4">
                 <Building className="h-4 w-4 text-primary" />
                 <h3 className="font-semibold">Business info</h3>
+                {!((isIndia ? user?.panNumber : true) && (user as any)?.billingAddress) && (
+                  <span className="ml-auto text-[10px] font-semibold uppercase tracking-widest text-amber-600 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 px-2 py-0.5 rounded">
+                    Required for invoices
+                  </span>
+                )}
               </div>
               <div className="space-y-3">
                 {isIndia && (
@@ -1065,59 +1152,6 @@ export default function ProfilePage() {
             )}
             </>)}
 
-            {/* Plan card — plan only; deal limits are enforced server-side
-                and explained by the upgrade modal, not counted in the UI.
-                Pro wears the brand's own pairing (emerald tile + gold seal,
-                like the logo); trial is the same family so it FEELS like Pro
-                but reads distinctly; free/lapsed goes neutral graphite. Paid
-                Pro is checked first — a Pro buyer mid-trial sees "Pro". */}
-            <div
-              className="rounded-2xl p-5 border-0 relative overflow-hidden"
-              style={{
-                background: hasActivePro(user)
-                  ? "linear-gradient(135deg, hsl(160 84% 14%) 0%, hsl(160 84% 22%) 50%, hsl(174 77% 26%) 100%)"
-                  : hasActiveTrial(user)
-                    ? "linear-gradient(135deg, hsl(160 84% 22%) 0%, hsl(160 84% 30%) 50%, hsl(174 77% 36%) 100%)"
-                    : "linear-gradient(135deg, hsl(215 28% 17%) 0%, hsl(215 25% 24%) 50%, hsl(210 20% 30%) 100%)",
-              }}
-            >
-              <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/10 -mr-10 -mt-10" />
-              <div className="absolute bottom-0 left-0 w-20 h-20 rounded-full bg-white/5 -ml-6 -mb-6" />
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-3">
-                  {hasActivePro(user)
-                    ? <Crown className="h-4 w-4 text-amber-400" />
-                    : <Sparkles className="h-4 w-4 text-white/80" />}
-                  <h3 className="font-semibold text-white/90">Your plan</h3>
-                </div>
-                <div className="flex items-end justify-between">
-                  <div>
-                    <p className="text-3xl font-bold text-white" data-testid="text-plan">
-                      {hasActivePro(user) ? "DealInSec Pro" : hasActiveTrial(user) ? "Pro trial" : "Free"}
-                    </p>
-                    <p className="text-sm text-white/60 mt-1">
-                      {hasActivePro(user)
-                        ? `${DEAL_SUITE_HIDDEN ? "Everything unlocked" : "Unlimited workflow"}${user?.planExpiresAt ? ` · until ${new Date(user.planExpiresAt).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}` : ""}`
-                        : hasActiveTrial(user)
-                          ? `${getTrialDaysLeft(user) === 1 ? "Last day" : `${getTrialDaysLeft(user)} days left`} · everything unlocked`
-                          : DEAL_SUITE_HIDDEN
-                            ? "Upgrade for more AI searches, drafts and coworker tasks"
-                            : "Deals & quotations · upgrade for agreements and invoices"}
-                    </p>
-                  </div>
-                  <Link href="/pricing">
-                    <Button
-                      size="sm"
-                      className="bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-sm"
-                      data-testid="button-upgrade"
-                    >
-                      <CreditCard className="h-4 w-4 mr-2" />
-                      {hasActivePro(user) ? "Manage plan" : "Upgrade"}
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </div>
           </div>
         )}
       </main>

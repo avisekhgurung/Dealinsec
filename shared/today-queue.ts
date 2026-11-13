@@ -18,14 +18,20 @@ import { paymentState } from "./paymentState";
 
 export type TodayUrgency = "now" | "soon" | "next";
 
-/** The kinds, in priority order: this is the order items appear in. */
+/**
+ * The kinds, in priority order: this is the order items appear in. Finding clients is the product, so its work
+ * (replies, follow-ups, messages to send, new leads) leads; the deal suite (invoices, agreements, quotations,
+ * deal terms) follows. Within that, "now" stays ahead of "soon" ahead of "next".
+ */
 export const TODAY_KINDS = [
-  "overdue_invoices",
+  "replied_leads",
   "follow_ups",
+  "overdue_invoices",
+  "approved_outreach",
+  "new_leads",
   "awaiting_signature",
   "ready_to_invoice",
   "due_soon_invoices",
-  "approved_outreach",
   "quotes_awaiting",
   "deal_terms",
 ] as const;
@@ -39,6 +45,7 @@ export const TODAY_SOURCES = {
   outreach: "outreach messages",
   quotations: "quotations",
   protection: "deal terms",
+  leadCounts: "leads",
 } as const;
 export type TodaySource = keyof typeof TODAY_SOURCES;
 
@@ -115,6 +122,8 @@ export interface TodayFacts {
   quotations: TodayQuote[] | null;
   /** Protection Check over pending deals (the briefing's rule-based count). Absent = not provided. */
   protection?: { withIssues: number; important: number } | null;
+  /** Leads per stage (the lead list's own counts: { new: 4, replied: 1, ... }). Absent = not provided. */
+  leadCounts?: Record<string, number> | null;
 }
 
 /** What the person can use. false = left out entirely (no access, or not set up here), not "unknown". */
@@ -126,6 +135,8 @@ export interface TodayAccess {
   quotations: boolean;
   /** Deals module (Protection Check findings). Absent = not shown. */
   deals?: boolean;
+  /** The lead pipeline (replied / new leads). Absent = not shown. */
+  leadPipeline?: boolean;
 }
 
 export interface TodayItem {
@@ -167,6 +178,8 @@ const DAY_MS = 86_400_000;
 
 /** Which sources each kind reads and what it needs the person to be able to use. */
 const KIND_RULES: Record<TodayKind, { sources: TodaySource[]; allowed: (can: TodayAccess) => boolean }> = {
+  replied_leads: { sources: ["leadCounts"], allowed: (c) => !!c.leadPipeline },
+  new_leads: { sources: ["leadCounts"], allowed: (c) => !!c.leadPipeline },
   overdue_invoices: { sources: ["invoices"], allowed: (c) => c.invoices },
   follow_ups: { sources: ["followUps"], allowed: (c) => c.leads },
   awaiting_signature: { sources: ["agreements"], allowed: (c) => c.agreements },
@@ -218,6 +231,30 @@ function overdueInvoices(list: TodayInvoice[], now: Date, money: NonNullable<Tod
     title: `${rows.length} invoices are overdue`,
     detail: `${sum ? `${sum} in total. ` : ""}Oldest: ${oldest.invoiceNumber} to ${oldest.brandName}, ${lateText}.`,
     href: "/invoices", action: "Open invoices",
+  };
+}
+
+/** Leads that answered: the warmest thing in the product, so the first thing on the list. */
+function repliedLeads(counts: Record<string, number>): TodayItem | null {
+  const n = Math.max(0, Math.floor(Number(counts.replied) || 0));
+  if (!n) return null;
+  return {
+    id: "replied_leads", kind: "replied_leads", urgency: "now", ...(n > 1 ? { count: n } : {}),
+    title: n === 1 ? "1 lead has replied" : `${n} leads have replied`,
+    detail: "Answer while the conversation is warm, then move the lead to a meeting or a proposal.",
+    href: "/leads", action: "Open leads",
+  };
+}
+
+/** Leads found but not looked at yet. */
+function newLeads(counts: Record<string, number>): TodayItem | null {
+  const n = Math.max(0, Math.floor(Number(counts.new) || 0));
+  if (!n) return null;
+  return {
+    id: "new_leads", kind: "new_leads", urgency: "soon", ...(n > 1 ? { count: n } : {}),
+    title: n === 1 ? "1 new lead to review" : `${n} new leads to review`,
+    detail: "Check the evidence, then draft a message or mark the ones that don't fit.",
+    href: "/leads", action: "Review leads",
   };
 }
 
@@ -407,7 +444,9 @@ export function todayQueue(facts: TodayFacts, now: Date, can: TodayAccess, opts:
     // A kind with any source missing says nothing: not zero, not "all clear".
     if (rule.sources.some((s) => facts[s] == null)) continue;
     const item =
-      kind === "overdue_invoices" ? overdueInvoices(facts.invoices!, now, money)
+      kind === "replied_leads" ? repliedLeads(facts.leadCounts!)
+      : kind === "new_leads" ? newLeads(facts.leadCounts!)
+      : kind === "overdue_invoices" ? overdueInvoices(facts.invoices!, now, money)
       : kind === "follow_ups" ? followUps(facts.followUps!)
       : kind === "awaiting_signature" ? awaitingSignature(facts.agreements!, now, party)
       : kind === "ready_to_invoice" ? readyToInvoice(facts.agreements!, facts.invoices!, money)

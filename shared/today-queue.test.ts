@@ -33,9 +33,17 @@ const FULL: TodayFacts = {
 
 describe("todayQueue: order", () => {
   it("lists every kind in priority order, now before soon before next", () => {
-    const q = todayQueue({ ...FULL, protection: { withIssues: 1, important: 1 } }, NOW, { ...ALL, deals: true }, { money, cap: 10 });
+    const q = todayQueue(
+      { ...FULL, protection: { withIssues: 1, important: 1 }, leadCounts: { new: 3, replied: 1 } },
+      NOW, { ...ALL, deals: true, leadPipeline: true }, { money, cap: 10 },
+    );
     expect(q.items.map((i) => i.kind)).toEqual([...TODAY_KINDS]);
-    expect(q.items.map((i) => i.urgency)).toEqual(["now", "now", "soon", "soon", "soon", "soon", "next", "next"]);
+    expect(q.items.map((i) => i.urgency)).toEqual(["now", "now", "now", "soon", "soon", "soon", "soon", "soon", "next", "next"]);
+    // Finding clients leads: every client-finding kind sits ahead of every deal-suite kind except overdue money.
+    const kinds = q.items.map((i) => i.kind);
+    expect(kinds.indexOf("replied_leads")).toBeLessThan(kinds.indexOf("awaiting_signature"));
+    expect(kinds.indexOf("new_leads")).toBeLessThan(kinds.indexOf("awaiting_signature"));
+    expect(kinds.indexOf("approved_outreach")).toBeLessThan(kinds.indexOf("awaiting_signature"));
     expect(q.overflow).toEqual([]);
     expect(q.allClear).toBe(false);
     expect(q.unknown).toEqual([]);
@@ -47,8 +55,36 @@ describe("todayQueue: order", () => {
     expect(q.overflow.map((i) => i.kind)).toEqual(["quotes_awaiting"]);
     expect(todaySummary(q)).toBe("7 things need you");
     const two = todayQueue(FULL, NOW, ALL, { money, cap: 2 });
-    expect(two.items.map((i) => i.kind)).toEqual(["overdue_invoices", "follow_ups"]);
+    expect(two.items.map((i) => i.kind)).toEqual(["follow_ups", "overdue_invoices"]);
     expect(two.overflow).toHaveLength(5);
+  });
+});
+
+describe("todayQueue: finding clients", () => {
+  const withLeads = (counts: Record<string, number> | null) =>
+    todayQueue({ ...EMPTY, leadCounts: counts }, NOW, { ...ALL, leadPipeline: true }, { money });
+
+  it("surfaces replies and new leads, replies first", () => {
+    const q = withLeads({ new: 4, replied: 2, won: 9 });
+    expect(q.items.map((i) => i.kind)).toEqual(["replied_leads", "new_leads"]);
+    expect(q.items[0]).toMatchObject({ title: "2 leads have replied", urgency: "now", count: 2 });
+    expect(q.items[1]).toMatchObject({ title: "4 new leads to review", urgency: "soon", count: 4 });
+  });
+
+  it("says nothing for stages that are empty, and is all clear when there are none", () => {
+    expect(withLeads({ won: 3, lost: 1 }).allClear).toBe(true);
+    expect(withLeads({ replied: 1 }).items[0].title).toBe("1 lead has replied");
+  });
+
+  it("a lead count that did not load is unknown, never all clear", () => {
+    const q = withLeads(null);
+    expect(q.allClear).toBe(false);
+    expect(q.unknown).toContain("leads");
+  });
+
+  it("is left out when the person has no pipeline access", () => {
+    const q = todayQueue({ ...EMPTY, leadCounts: { replied: 5 } }, NOW, ALL, { money });
+    expect(q.items.map((i) => i.kind)).not.toContain("replied_leads");
   });
 });
 

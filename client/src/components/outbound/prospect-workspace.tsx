@@ -384,6 +384,11 @@ export function ProspectWorkspace({ canExport, onOpen, onPrepared }: { canExport
       ) : (
         <>
         {/* Phones and tablets: one card per prospect (two columns on a tablet), nothing to scroll sideways; the table on laptops up. */}
+        {/* The cards have no header row, so the "select this page" box the table keeps there sits above them. */}
+        <label className="flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-medium lg:hidden" data-testid="select-page-mobile">
+          <Checkbox checked={pageAll ? true : pageSome ? "indeterminate" : false} disabled={sel.mode === "filter"} onCheckedChange={() => setSel((cur) => togglePage(cur, pageIds))} aria-label="Select every prospect on this page" />
+          Select all on this page
+        </label>
         <ul className={cn("grid gap-2 sm:grid-cols-2 lg:hidden", q.isFetching && "opacity-70")} aria-busy={q.isFetching} aria-label="Prospects" data-testid="workspace-cards">
           {rows.map((r) => {
             const on = isSelected(sel, r.id);
