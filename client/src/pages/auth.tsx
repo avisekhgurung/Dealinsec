@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Loader2, Search, Users, Send, MessagesSquare, Handshake, Check, ArrowLeft, Eye, EyeOff,
+  Loader2, Radar, Handshake, Wallet, Check, ArrowLeft, Eye, EyeOff,
   Mail, Lock, ShieldCheck, KeyRound, Trash2, Sparkles,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -29,14 +29,11 @@ import { trackEvent } from "@/lib/analytics";
 import { postAuthDestination } from "@/lib/deal-prefill";
 import { authErrorMessage } from "@/lib/auth-copy";
 
-/** The whole journey: from a search to a client conversation. Short labels so all six fit a phone. */
-const PIPELINE = [
-  { icon: Search, label: "Research" },
-  { icon: ShieldCheck, label: "Evidence" },
-  { icon: Users, label: "Lead" },
-  { icon: Send, label: "Outreach" },
-  { icon: MessagesSquare, label: "Reply" },
-  { icon: Handshake, label: "Paid" },
+/** The three things the product does, the same three the homepage hero shows, in the order they happen. */
+const JOURNEY = [
+  { icon: Radar, label: "Find clients", text: "AI research with evidence and a reason to reach out now" },
+  { icon: Handshake, label: "Win deals", text: "Outreach you approve; leads and follow-ups on one record" },
+  { icon: Wallet, label: "Get paid", text: "Quotation, signed agreement, invoice and payment tracking, free" },
 ];
 
 const PROOF_POINTS = [
@@ -141,26 +138,26 @@ export default function AuthPage() {
 
         <div className="relative mt-7">
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-300 mb-2">
-            Find · Win · Get paid
+            For freelancers and service providers in India
           </p>
           <h2 className="text-[1.6rem] leading-[1.2] font-bold tracking-tight">
             Find clients.<br />
             <span className="text-emerald-300">Win deals. Get paid.</span>
           </h2>
 
-          <div className="flex items-center gap-1 mt-5">
-            {PIPELINE.map(({ icon: Icon, label }, i) => (
-              <div key={label} className="flex items-center gap-1 min-w-0">
-                {i > 0 && <span className="w-3 h-px bg-emerald-400/40 shrink-0" aria-hidden="true" />}
-                <div className="flex flex-col items-center gap-1">
+          <ol className="grid grid-cols-3 gap-2 mt-5">
+            {JOURNEY.map(({ icon: Icon, label }, i) => (
+              <li key={label} className="rounded-xl bg-white/10 border border-white/15 px-2 py-2.5 flex flex-col items-center gap-1.5 min-w-0 text-center">
+                <span className="relative">
                   <span className="w-9 h-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center">
-                    <Icon className="w-3.5 h-3.5 text-emerald-200" strokeWidth={2} />
+                    <Icon className="w-4 h-4 text-emerald-200" strokeWidth={2} />
                   </span>
-                  <span className="text-[9px] font-semibold text-emerald-100/80">{label}</span>
-                </div>
-              </div>
+                  <span className="absolute -top-1.5 -left-1.5 w-4 h-4 rounded-full bg-emerald-400 text-[9px] font-bold text-emerald-950 flex items-center justify-center">{i + 1}</span>
+                </span>
+                <span className="text-[10px] font-semibold leading-tight text-emerald-50">{label}</span>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
       </div>
 
@@ -376,41 +373,35 @@ export default function AuthPage() {
         <div className="absolute top-0 right-0 w-96 h-96 rounded-full bg-white/5 -mr-24 -mt-24" aria-hidden="true" />
         <div className="absolute bottom-0 left-0 w-72 h-72 rounded-full bg-emerald-400/10 -ml-16 -mb-16 blur-2xl" aria-hidden="true" />
 
-        <div className="relative max-w-lg">
+        <div className="relative w-full min-w-0 max-w-lg">
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-300 mb-4">
-            Find · Win · Get paid
+            For freelancers and service providers in India
           </p>
           <h2 className="text-[clamp(1.9rem,3.2vw,3.2rem)] font-bold text-white leading-[1.12] tracking-[-0.03em]">
             Find clients.<br />
             <span className="text-emerald-300">Win deals. Get paid.</span>
           </h2>
           <p className="text-emerald-100/70 mt-4 text-sm leading-relaxed">
-            For freelancers, consultants and small agencies: your AI team researches
-            potential clients with evidence behind every name and drafts the outreach you
-            approve. When you win the work, the quotation, the signed agreement, the invoice
-            and payment tracking are free on every plan.
+            Your AI team finds potential clients with evidence and drafts the outreach you
+            approve. Deal to invoice is free on every plan.
           </p>
 
-          <div className="flex items-center gap-1.5 xl:gap-2 mt-9">
-            {PIPELINE.map(({ icon: Icon, label }, i) => (
-              <div key={label} className="flex items-center gap-1.5 xl:gap-2">
-                {i > 0 && (
-                  <span
-                    className="w-3 xl:w-5 border-t border-dashed border-emerald-400/50"
-                    aria-hidden="true"
-                  />
-                )}
-                <div className="flex flex-col items-center gap-2">
-                  <span className="w-10 h-10 xl:w-12 xl:h-12 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center">
-                    <Icon className="w-[18px] h-[18px] xl:w-5 xl:h-5 text-emerald-200" strokeWidth={2} />
-                  </span>
-                  <span className="text-[11px] font-semibold text-emerald-100/80 tracking-wide">{label}</span>
-                </div>
-              </div>
+          <ol className="mt-8 space-y-2.5">
+            {JOURNEY.map(({ icon: Icon, label, text }, i) => (
+              <li key={label} className="flex items-center gap-3 rounded-xl bg-white/[0.07] border border-white/10 px-3.5 py-3">
+                <span className="w-7 h-7 rounded-full bg-emerald-400/20 text-xs font-bold text-emerald-100 flex items-center justify-center shrink-0">{i + 1}</span>
+                <span className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0">
+                  <Icon className="w-[18px] h-[18px] text-emerald-200" strokeWidth={2} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-white">{label}</span>
+                  <span className="block text-xs text-emerald-100/70 leading-snug">{text}</span>
+                </span>
+              </li>
             ))}
-          </div>
+          </ol>
 
-          <div className="mt-9 pt-8 border-t border-emerald-400/20">
+          <div className="mt-8 pt-7 border-t border-emerald-400/20">
             <ul className="space-y-3">
               {PROOF_POINTS.map((point) => (
                 <li key={point} className="flex items-center gap-2.5 text-sm text-emerald-50/90">
