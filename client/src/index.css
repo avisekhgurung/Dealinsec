@@ -591,13 +591,16 @@
 
   /* ── Mobile input / form responsiveness ──────────────────────────────────── */
   input,
-  textarea,
-  select {
+  textarea {
     /* Prevent iOS zoom on focus (requires font-size >= 16px) */
     font-size: 16px;
     /* Full width by default */
     width: 100%;
     /* Ensure consistent box-sizing */
+    box-sizing: border-box;
+  }
+
+  select {
     box-sizing: border-box;
   }
 
@@ -616,11 +619,16 @@
     padding-right: 0.875rem;
   }
 
-  /* Fix select elements on iOS */
-  select {
-    -webkit-appearance: none;
-    appearance: none;
-    min-height: 44px;
+  /* Touch only: iOS zoom guard, tap targets, and the appearance reset these need. On a pointer
+     screen a native <select> keeps its own arrow, because nothing here draws one in its place. */
+  @media (max-width: 1023px) {
+    select {
+      font-size: 16px;
+      width: 100%;
+      -webkit-appearance: none;
+      appearance: none;
+      min-height: 44px;
+    }
   }
 
   /* Stack two-column grids on very small screens */
