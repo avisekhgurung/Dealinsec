@@ -25,8 +25,9 @@ import {
   TrendingUp, IndianRupee, Banknote, CheckCircle2,
   UserCircle, MapPin, FileText, PenTool, Landmark, X as XIcon, Sparkles,
   Crown, Rocket, Users2, UserPlus2, Settings as SettingsIcon,
-  Zap, FileSignature, ArrowUpRight, Radar
+  Zap, FileSignature, ArrowUpRight, Radar, UsersRound
 } from "lucide-react";
+import { USAGE_URL } from "@/lib/credit-keys";
 import {
   BarChart, Bar, Cell, PieChart, Pie, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -41,6 +42,85 @@ import type { Deal, Contract, BrandInvoice, Quote, User } from "@shared/schema";
 import { listUrl as leadListUrl, type LeadList } from "@/lib/leads";
 import { isFirstRun } from "@/lib/first-run";
 import { invoiceStats, paidInvoicesSubline } from "@shared/invoice-stats";
+
+// ─── Desktop tiles ───────────────────────────────────────────────────────────
+// On a laptop the Home page is a six-column bento (see <main>): these two small tiles fill the right rail beside
+// Today. The phone keeps its single column, so they only render from lg.
+
+/** The three things to do from Home, in the order the product runs: find, ask the team, paper the win. */
+function QuickActionsTile({ canSeeOutbound, canCreateDeal, newDealCta }: { canSeeOutbound: boolean; canCreateDeal: boolean; newDealCta: string }) {
+  const actions = [
+    canSeeOutbound ? { href: "/outbound", Icon: Radar, title: "Find clients", text: "Describe who you want; Client Radar researches them", testId: "tile-find-clients" } : null,
+    { href: "/ai-league", Icon: UsersRound, title: "Ask your AI Team", text: "Nibo finds, Mika drafts, Zee briefs", testId: "tile-ai-team" },
+    canCreateDeal && !DEAL_SUITE_HIDDEN ? { href: "/deals/new", Icon: Plus, title: newDealCta, text: "Quotation, agreement, invoice: free", testId: "tile-new-deal" } : null,
+  ].filter((a): a is NonNullable<typeof a> => !!a);
+  return (
+    <Card className="relative h-full overflow-hidden border-0 bg-gradient-to-br from-emerald-700 via-emerald-700 to-teal-800 text-white shadow-lg shadow-emerald-900/20" data-testid="quick-actions">
+      <span aria-hidden className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
+      <CardContent className="relative flex h-full flex-col p-4">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-100/80">Start here</p>
+        <ul className="mt-2 flex flex-1 flex-col gap-1.5">
+          {actions.map(({ href, Icon, title, text, testId }) => (
+            <li key={href}>
+              <Link href={href} className="group flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.07] px-3 py-2.5 transition hover:bg-white/15" data-testid={testId}>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/15"><Icon className="h-4 w-4" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold">{title}</span>
+                  <span className="block truncate text-[11px] text-emerald-100/75">{text}</span>
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-emerald-100/70 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface TileAllowance { used: number; limit: number; remaining: number }
+/** Searches and AI drafts left in the rolling window, read from the server's own count, with the way to top up. */
+function AllowanceTile() {
+  const q = useQuery<{ ok: boolean; usage: { plan: { tier: string; label: string; windowDays: number; searches: TileAllowance | null; drafts: TileAllowance | null } } }>({ queryKey: [USAGE_URL], retry: false, staleTime: 30_000 });
+  const plan = q.data?.usage?.plan;
+  if (!plan) return null;
+  const unlimited = plan.tier === "unlimited";
+  const rows: { label: string; a: TileAllowance | null; href: string }[] = [
+    { label: "Client Radar searches", a: plan.searches, href: "/outbound" },
+    { label: "AI outreach drafts", a: plan.drafts, href: "/leads" },
+  ];
+  const short = rows.some((r) => r.a && r.a.remaining === 0);
+  return (
+    <Card className="glass-card h-full" data-testid="allowance-tile">
+      <CardContent className="flex h-full flex-col gap-3 p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="text-sm font-semibold">{plan.label}</p>
+            <p className="text-[11px] text-muted-foreground">{unlimited ? "No monthly limits on this workspace" : `Last ${plan.windowDays} days · each use frees up on its own date`}</p>
+          </div>
+          <Link href="/wallet#boosters" className="text-[11px] font-semibold text-primary hover:underline" data-testid="tile-boosters">{short ? "Buy a booster" : "Boosters"}</Link>
+        </div>
+        {!unlimited && (
+          <ul className="space-y-2.5">
+            {rows.map(({ label, a, href }) => {
+              const pct = a && a.limit > 0 ? Math.min(100, Math.round((a.used / a.limit) * 100)) : 0;
+              return (
+                <li key={label}>
+                  <Link href={href} className="flex items-baseline justify-between gap-2 text-xs">
+                    <span className="text-muted-foreground">{label}</span>
+                    <span className="font-semibold tabular-nums">{a ? <>{a.remaining}<span className="font-normal text-muted-foreground"> of {a.limit} left</span></> : "–"}</span>
+                  </Link>
+                  <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-muted"><span className={cn("block h-full rounded-full", a && a.remaining === 0 ? "bg-amber-500" : pct >= 80 ? "bg-amber-400" : "bg-emerald-500")} style={{ width: `${pct}%` }} /></span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {short && <p className="text-[11px] font-medium text-amber-700 dark:text-amber-400">Used up for now. Only this pauses; a booster pack covers the next ones right away.</p>}
+      </CardContent>
+    </Card>
+  );
+}
 
 // ─── Team seats strip ────────────────────────────────────────────────────────
 function TeamSeatsCard() {
@@ -854,6 +934,7 @@ export default function DashboardPage() {
       <TeamSeatsCard />
     </>
   );
+  const quickActionsEl = <QuickActionsTile canSeeOutbound={canSeeOutbound} canCreateDeal={canCreateDeal} newDealCta={audience.newDealCta} />;
   // "What needs me today?" — overdue money, due follow-ups, unsigned agreements, work ready to invoice, approved
   // messages to send, quotations waiting. It replaces the Money Radar, follow-ups and protection cards that stood here.
   const todayEl = <TodayPanel />;
@@ -1410,41 +1491,48 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="px-4 py-5 space-y-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-6 lg:space-y-5 xl:px-10">
+      {/* One column on a phone. From lg a six-column bento: every direct child names its span, a wrapper whose
+          widget rendered nothing is `empty:hidden` so it leaves no hole, and dense flow backfills the rail. */}
+      <main className="px-4 py-5 space-y-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:grid lg:grid-cols-6 lg:grid-flow-dense lg:gap-5 lg:space-y-0 lg:px-8 lg:py-6 xl:px-10" data-testid="dashboard-bento">
         {dealsError ? (
           // Everything that counts or charts deals is left out until they load.
           <>
-            <Card className="glass-card">
+            <Card className="glass-card lg:col-span-6">
               <LoadError what="your deals" compact onRetry={() => void refetchDeals()} retrying={dealsFetching} />
             </Card>
-            <GettingStarted />
-            {profileStripEl}
+            <div className="empty:hidden lg:col-span-6"><GettingStarted /></div>
+            <div className="empty:hidden lg:col-span-6">{profileStripEl}</div>
             {/* Today reads its own sources (invoices, agreements, follow-ups…), so it still answers without deals. */}
-            {todayEl}
-            {accountEl}
+            <div className="empty:hidden lg:col-span-4 lg:row-span-2">{todayEl}</div>
+            <div className="hidden lg:col-span-2 lg:block">{quickActionsEl}</div>
+            <div className="empty:hidden lg:col-span-2 space-y-4">{accountEl}</div>
           </>
         ) : firstRun ? (
           <>
-            <GettingStarted />
-            {nudgeEl}
+            <div className="empty:hidden lg:col-span-6"><GettingStarted /></div>
+            <div className="empty:hidden lg:col-span-6">{nudgeEl}</div>
             {/* A brand-new account sees Today only when something real needs it — never an unearned "All clear". */}
-            <TodayPanel hideWhenEmpty />
-            {accountEl}
+            <div className="empty:hidden lg:col-span-4 lg:row-span-2"><TodayPanel hideWhenEmpty /></div>
+            <div className="hidden lg:col-span-2 lg:block">{quickActionsEl}</div>
+            <div className="hidden empty:hidden lg:col-span-2 lg:block"><AllowanceTile /></div>
             {/* First run means nothing on either side yet, so every deal chart would be empty. The account sees what
                 to do instead; the numbers appear below once there is something to count. */}
-            {emptyEl}
+            <div className="empty:hidden lg:col-span-4">{emptyEl}</div>
+            <div className="empty:hidden lg:col-span-2 space-y-4">{accountEl}</div>
           </>
         ) : (
           <>
-            <GettingStarted />
-            {profileStripEl}
-            {todayEl}
+            <div className="empty:hidden lg:col-span-6"><GettingStarted /></div>
+            <div className="empty:hidden lg:col-span-6">{profileStripEl}</div>
+            <div className="empty:hidden lg:col-span-4 lg:row-span-2">{todayEl}</div>
+            <div className="hidden lg:col-span-2 lg:block">{quickActionsEl}</div>
+            <div className="hidden empty:hidden lg:col-span-2 lg:block"><AllowanceTile /></div>
             {/* TWO MODES, NEVER MIXED (13 Nov 2026, founder). One mode's numbers are read at a time: a deal count
                 beside a reply rate describes a funnel that does not exist, because each side is usable without the
                 other. Leads is the single bridge, so it is the one thing both modes show. */}
             {!isLoading && (
-              <section className="space-y-4 lg:space-y-5" aria-labelledby="dashboard-mode-title" data-testid={`dashboard-mode-${workMode}`}>
-                <div className="flex flex-wrap items-center justify-between gap-3">
+              <section className="space-y-4 lg:col-span-6 lg:grid lg:grid-cols-6 lg:grid-flow-dense lg:gap-5 lg:space-y-0" aria-labelledby="dashboard-mode-title" data-testid={`dashboard-mode-${workMode}`}>
+                <div className="flex flex-wrap items-center justify-between gap-3 lg:col-span-6">
                   <div className="min-w-0">
                     <h2 id="dashboard-mode-title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       {WORK_MODE_LABELS[workMode]}
@@ -1455,22 +1543,23 @@ export default function DashboardPage() {
                   {!DEAL_SUITE_HIDDEN && <WorkModeTabs mode={workMode} onSelect={setWorkMode} />}
                 </div>
 
-                {/* The bridge. A lead is where finding a client ends and won work begins, so it belongs to both. */}
-                <LeadsStrip />
+                {/* The bridge. A lead is where finding a client ends and won work begins, so it belongs to both.
+                    Beside the funnel it is a tile; above the suite's numbers it stays a strip. */}
+                <div className={cn("empty:hidden [&>a]:h-full", workMode === "find" ? "lg:col-span-2" : "lg:col-span-6")}><LeadsStrip /></div>
 
                 {workMode === "find" ? (
-                  <SalesFunnel />
+                  <div className="lg:col-span-4 [&>*]:h-full"><SalesFunnel /></div>
                 ) : totalDeals > 0 ? (
                   <>
-                    {statsEl}
-                    {analyticsEl}
-                    {chartsEl}
-                    {dealStatusEl}
-                    {recentEl}
+                    <div className="empty:hidden lg:col-span-6">{statsEl}</div>
+                    <div className="empty:hidden lg:col-span-6">{analyticsEl}</div>
+                    <div className="empty:hidden lg:col-span-6">{chartsEl}</div>
+                    <div className="empty:hidden lg:col-span-3 [&>*]:h-full">{dealStatusEl}</div>
+                    <div className="empty:hidden lg:col-span-3 [&>*]:h-full">{recentEl}</div>
                   </>
                 ) : (
                   /* Nothing to chart yet. Say what the suite is for rather than showing five empty cards. */
-                  <Card className="glass-card">
+                  <Card className="glass-card lg:col-span-6">
                     <CardContent className="p-4 flex items-center gap-3.5">
                       <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-emerald-500/10">
                         <FileSignature className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
@@ -1487,9 +1576,10 @@ export default function DashboardPage() {
                 )}
               </section>
             )}
-            <section className="space-y-4" aria-label="Account and setup" data-testid="dashboard-account">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Account</h2>
-              {accountEl}
+            <section className="space-y-4 lg:col-span-6 lg:grid lg:grid-cols-6 lg:gap-5 lg:space-y-0" aria-label="Account and setup" data-testid="dashboard-account">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:col-span-6">Account</h2>
+              <div className="empty:hidden lg:col-span-3 lg:[&:has(+div:empty)]:col-span-6 [&>*]:h-full"><SubscriptionCard user={user} /></div>
+              <div className="empty:hidden lg:col-span-3 [&>*]:h-full"><TeamSeatsCard /></div>
             </section>
           </>
         )}
