@@ -16,21 +16,23 @@ export default defineConfig({
       injectRegister: null,
       includeAssets: ["favicon.svg", "favicon.png", "apple-touch-icon.png"],
       manifest: {
-        name: "DealInSec — Find Clients. Close Deals. Get Paid.",
+        name: "DealInSec: Find clients. Win deals. Get paid.",
         short_name: "DealInSec",
         description:
           "Find clients, close deals and get paid: prospect research with evidence, a clear pipeline, and quotations, signed agreements, invoices and payment tracking in one workspace. For small agencies, consultants and freelancers.",
-        theme_color: "#FFFFFF",
-        background_color: "#0F172A",
+        // Dark end to end (client/src/lib/theme.ts); the icons sit on this same navy.
+        theme_color: "#0B1220",
+        background_color: "#0B1220",
         display: "standalone",
         orientation: "portrait",
         scope: "/",
         start_url: "/dashboard",
         categories: ["business", "productivity", "finance"],
         icons: [
-          { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
-          { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
-          { src: "/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          // "?v=dark" so phones that installed the app with the old white icons fetch these on their next manifest check.
+          { src: "/icon-192.png?v=dark", sizes: "192x192", type: "image/png" },
+          { src: "/icon-512.png?v=dark", sizes: "512x512", type: "image/png" },
+          { src: "/icon-maskable-512.png?v=dark", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
       },
       workbox: {
