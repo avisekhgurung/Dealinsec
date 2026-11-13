@@ -38,10 +38,14 @@ async function main() {
     let granted = 0, removed = 0;
     for (const r of rows) {
       const perms = Array.isArray(r.permissions) ? r.permissions : [];
+      // The seed definitions now include the finding permissions; the rows were written before those existed, so the
+      // historic seed set is the definition minus them. A row is untouched when it holds exactly that (finding
+      // permissions tolerated, in case this script already ran once).
       const seed = DEFAULT_ROLE_SEEDS.find((s) => s.name === r.name);
+      const seedBase = seed ? seed.permissions.filter((p) => !(FINDING_PERMISSIONS as string[]).includes(p)) : [];
       const isUntouchedSeed = !!seed && r.members === 0 &&
-        perms.every((p) => seed.permissions.includes(p as any) || (FINDING_PERMISSIONS as string[]).includes(p)) &&
-        seed.permissions.every((p) => perms.includes(p));
+        perms.every((p) => (seedBase as string[]).includes(p) || (FINDING_PERMISSIONS as string[]).includes(p)) &&
+        seedBase.every((p) => perms.includes(p));
       if (isUntouchedSeed) {
         removed++;
         console.log(`${dry ? "would remove" : "removing"} unused seeded role "${r.name}" in ${r.organization_id}`);
