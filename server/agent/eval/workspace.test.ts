@@ -124,16 +124,17 @@ describe("update_invoice_details", () => {
     }
     expect(world().invoices[0]).toMatchObject({ dueDate: "2026-10-15", dealAmountMinor: 500_000, status: "Unpaid", brandName: "Acme" });
   });
-  it("a paid invoice is locked, a date before the invoice date is refused, a foreign invoice is not found, Pro is required", async () => {
+  it("a paid invoice is locked, a date before the invoice date is refused, a foreign invoice is not found, and the plan never refuses", async () => {
     const paid = inv({ status: "Paid" });
     expect(toolResult((await run({ autonomy: 1, steps: [call("update_invoice_details", { invoiceId: paid.id, notes: "x" }), say("no")] })).provider)).toMatch(/paid, and a paid invoice can't be edited/);
     const open = inv();
     expect(toolResult((await run({ autonomy: 1, steps: [call("update_invoice_details", { invoiceId: open.id, dueDate: "2026-09-30" }), say("no")] })).provider)).toMatch(/before the invoice date/);
     const foreign = seedInvoice(world(), active().id, { organizationId: ORG2, userId: "u2" });
     expect(toolResult((await run({ autonomy: 1, steps: [call("update_invoice_details", { invoiceId: foreign.id, notes: "x" }), say("no")] })).provider)).toMatch(/isn't in your organization/);
+    // Invoices are free on every plan (13 Nov 2026): a free workspace edits its own invoice and the note lands.
     world().billing.set("org-1", { id: "u1", plan: "free" });
-    expect(toolResult((await run({ autonomy: 1, steps: [call("update_invoice_details", { invoiceId: open.id, notes: "x" }), say("no")] })).provider)).toMatch(/Pro feature/);
-    expect(world().invoices.find((x) => x.id === open.id)!.notes).toBeNull();
+    expect(toolResult((await run({ autonomy: 1, steps: [call("update_invoice_details", { invoiceId: open.id, notes: "x" }), say("done")] })).provider)).toMatch(/Updated invoice/);
+    expect(world().invoices.find((x) => x.id === open.id)!.notes).toBe("x");
   });
 });
 

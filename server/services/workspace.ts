@@ -53,7 +53,6 @@ export async function planInvoiceDetails(user: User, raw: unknown): Promise<Resu
   const { invoiceId, ...edit } = parsed.data;
   if (edit.dueDate === undefined && edit.notes === undefined) return fail(400, "nothing", "Tell me the new due date or the new note.");
   if (!memberCan(user, "payments.manage")) return fail(403, "forbidden", "Your role doesn't allow editing invoices. Ask your organization owner.");
-  if (!hasProAccess(await getBillingUser(user))) return fail(402, "upgrade", "Editing invoices is a Pro feature: upgrade to do this.");
   const invoice = await storage.getBrandInvoice(invoiceId);
   if (!invoice || !inOrg(invoice, user)) return fail(404, "not_found", "That invoice isn't in your organization.");
   // The route's paid lock, and the same words as its refusal.

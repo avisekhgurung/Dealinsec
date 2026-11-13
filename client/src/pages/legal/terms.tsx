@@ -52,7 +52,7 @@ export default function TermsOfService() {
           <li><strong>Deal Management</strong> — Create and track client deals (free plan: 4 Deal Credits per month; 1 credit = 1 deal + its quotation).</li>
           <li><strong>Quotation Generation</strong> — Generate professional quotations (included with the deal's credit).</li>
           <li><strong>Agreement Generation</strong> — Create professionally formatted agreement documents from your deal data (requires an active DealInSec Pro subscription). See Section 5 for what our electronic acceptance does and does not mean.</li>
-          <li><strong>Invoice Generation &amp; Payment Tracking</strong> — Generate professional invoices and track payments (requires DealInSec Pro).</li>
+          <li><strong>Invoice Generation &amp; Payment Tracking</strong> — Generate professional invoices and track payments (included on every plan).</li>
         </ul>
 
         <h2>5. Documents, Electronic Acceptance &amp; Signatures</h2>
@@ -118,7 +118,7 @@ export default function TermsOfService() {
         <ul>
           <li><strong>No free trial</strong> — new accounts start on the free plan; DealInSec no longer offers a trial of DealInSec Pro. A trial granted before 18 October 2026 continues until its original end date: it has no monetary value, is non-transferable and ends automatically, and nothing is charged for it. Accounts created to obtain further trials could have that trial revoked or the account suspended.</li>
           <li>The free plan includes 4 Deal Credits each month. Unused monthly credits do not roll over.</li>
-          <li><strong>DealInSec Pro</strong> (₹299/month) unlocks Client Radar with the Pro research allowance and unlimited deals, quotations, agreements, invoices and payment tracking for the paid term. Client Radar research is limited per plan and per day; no plan includes unlimited research or sending.</li>
+          <li><strong>DealInSec Pro</strong> (₹299/month) raises Client Radar to the Pro research allowance, adds AI outreach drafts and team members for the paid term. Deals, quotations, agreements, invoices and payment tracking are included on every plan, free of charge. Client Radar research is limited per plan and per day; no plan includes unlimited research or sending.</li>
           <li>All plans are one-time payments for a fixed term processed via our integrated Razorpay payment gateway — nothing auto-renews.</li>
           <li>Plans and credits are non-transferable and tied to your account.</li>
           <li>All prices are listed in Indian Rupees (INR) and inclusive of applicable taxes.</li>

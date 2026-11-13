@@ -75,7 +75,6 @@ export async function setInvoicePaymentStatus(
   status: "Paid" | "Unpaid",
 ): Promise<{ ok: true; invoice: BrandInvoice } | { ok: false; code: string; message: string }> {
   if (!memberCan(user, "payments.manage")) return { ok: false, code: "forbidden", message: "Your role doesn't allow recording payments. Ask your organization owner." };
-  if (!hasProAccess(await getBillingUser(user))) return { ok: false, code: "upgrade", message: "Payment tracking is a Pro feature — upgrade to record payments." };
   const invoice = await storage.getBrandInvoice(invoiceId);
   if (!invoice || !inOrg(invoice, user)) return { ok: false, code: "not_found", message: "That invoice isn't in your organization." };
   if (invoice.status === status) {

@@ -429,14 +429,12 @@ const convertTool: AgentTool<z.infer<typeof convertInput>> = {
     if (!p.ok) return { ok: false, code: p.code, message: p.message, ...(typeof (p as any).dealId === "number" ? { route: `/deals/${(p as any).dealId}` } : {}) };
     const { built, lead } = p;
     const draft = buildDealDraft(built.data as any, built.amountMajor, built.settings, "");
-    const billing = await getBillingUser(who(ctx));
-    const spendsCredit = !hasProAccess(billing) && !hasActiveDealBoost(billing);
     return {
       ok: true, args: input as Record<string, unknown>,
       preview: {
         title: `Close ${lead.companyName} and create the deal`,
         lines: [{ label: "Client", value: draft.client }, { label: "Project", value: draft.project }, { label: "Amount", value: draft.amount }, { label: "Lead", value: `${stageLabel(lead.status)} → Won` }],
-        effects: [...(spendsCredit ? ["Uses 1 of your Deal Credits for this month."] : []), "Creates the deal and marks the lead Won. Nothing is sent to the client."],
+        effects: ["Creates the deal and marks the lead Won. Nothing is sent to the client."],
         draft,
       },
     };

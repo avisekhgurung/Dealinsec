@@ -27,7 +27,6 @@ function paymentTool(status: "Paid" | "Unpaid"): AgentTool<{ invoiceId: number }
     input,
     authorize: allOf(needsPermission("payments.manage", "recording payments"), needsRead("invoices")),
     async prepare(ctx, { invoiceId }) {
-      if (!hasProAccess(await getBillingUser(ctx.user as any))) return { ok: false, code: "upgrade", message: "Payment tracking is a Pro feature — upgrade to record payments." };
       const inv = await storage.getBrandInvoice(invoiceId);
       if (!inv || !inOrg(inv, ctx.user as any)) return { ok: false, code: "not_found", message: "That invoice isn't in your organization." };
       if (inv.status === status) return { ok: false, code: "no_change", message: `${inv.invoiceNumber} is already marked ${status}.` };

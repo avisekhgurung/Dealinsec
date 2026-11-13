@@ -125,14 +125,11 @@ const createDeal: AgentTool<z.infer<typeof createDealInput>> = {
       warnings.push(`Your message mentions ${others.join(", ")}, but this workspace uses ${built.settings.currency}, so the amount will be saved in ${built.settings.currency}.`);
     }
 
-    // A free-plan deal spends one of the month's credits. The user hasn't
-    // agreed to that just by having the agent at level 1, so it always asks.
-    const billing = await getBillingUser(ctx.user as any);
-    const spendsCredit = !hasProAccess(billing) && !hasActiveDealBoost(billing);
+    // Deals are free on every plan, so creating one spends nothing and needs
+    // no forced approval beyond the agent's own level.
     return {
       ok: true,
       args: input as Record<string, unknown>,
-      forceApproval: spendsCredit,
       preview: {
         title: `Create deal: ${draft.client} — ${draft.project}`,
         lines: [
@@ -143,7 +140,7 @@ const createDeal: AgentTool<z.infer<typeof createDealInput>> = {
           { label: "Timeline", value: input.startDate && input.endDate ? draft.timeline : "Not specified — defaults to 30 days from today" },
           ...(warnings.length ? [{ label: "Check", value: warnings.join(" ") }] : []),
         ],
-        effects: spendsCredit ? ["Uses 1 of your Deal Credits for this month."] : [],
+        effects: [],
         draft: { ...draft, warnings },
       },
     };

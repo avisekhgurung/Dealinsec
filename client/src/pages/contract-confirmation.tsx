@@ -14,7 +14,7 @@ import { ArrowLeft, Shield, AlertTriangle, PenLine, Loader2, CreditCard, CheckCi
 import { useAuth } from "@/hooks/useAuth";
 import { CreditAnimationOverlay } from "@/components/credit-animation-overlay";
 import { trackEvent } from "@/lib/analytics";
-import { STANDARD_TERMS, hasActivePro, hasProAccess, hasActiveTrial } from "@shared/schema";
+import { STANDARD_TERMS } from "@shared/schema";
 import type { Deal, Contract } from "@shared/schema";
 import { audienceForDealType, defaultExclusive } from "@shared/audience";
 import { useUpgradeModal } from "@/components/upgrade-modal";
@@ -49,16 +49,9 @@ export default function ContractConfirmationPage() {
   const [customTermsList, setCustomTermsList] = useState<string[]>([""]);
   const [termsInitialized, setTermsInitialized] = useState(false);
 
-  // Agreements are a Pro feature in the subscription-first model. This page's
-  // entry point (deal-details) is already gated; this is defense-in-depth.
-  // ENTITLEMENT vs DISPLAY — deliberately split. canCreate mirrors the
-  // server's requirePro gate (paid Pro OR active trial): it drives the
-  // submit button, so a trialist is never left staring at a disabled
-  // "Create Agreement" that would actually succeed. isPaidPro drives copy
-  // only — a trialist sees trial framing, never "your Pro plan".
-  const canCreate = hasProAccess(user);
-  const isPaidPro = hasActivePro(user);
-  const onTrial = hasActiveTrial(user);
+  // Agreements are free on every plan (13 Nov 2026), so there is nothing left
+  // to gate here: the server stopped checking the plan on this route too.
+  const canCreate = true;
   const needsBillingAddress = !user?.billingAddress;
   // The org's country, which is the one the agreement is issued under (see
   // issuedCountry in contract-pdf.tsx). A PAN is an Indian tax ID: requiring
@@ -356,14 +349,6 @@ export default function ContractConfirmationPage() {
             </Button>
             <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Create agreement</h1>
 
-            {/* Pro pill in header — agreements are a Pro feature. Trialists
-                see "Trial" so paid and trial never look the same. */}
-            <div className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
-              <Crown className="w-3.5 h-3.5 text-amber-500" />
-              <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
-                {!isPaidPro && onTrial ? "Trial" : "Pro"}
-              </span>
-            </div>
           </div>
         </header>
 
@@ -419,10 +404,10 @@ export default function ContractConfirmationPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-base font-bold text-emerald-800 dark:text-emerald-300">
-                    {isPaidPro ? "Included in DealInSec Pro" : "Included in your free trial"}
+                    Free on every plan
                   </p>
                   <p className="text-xs text-emerald-700/70 dark:text-emerald-400/60 mt-0.5">
-                    {isPaidPro ? "Unlimited agreements on your plan" : "Unlimited agreements while your trial is active"}
+                    No cap on agreements, and no card needed
                   </p>
                 </div>
                 <div className="flex-shrink-0 text-right">
@@ -488,34 +473,6 @@ export default function ContractConfirmationPage() {
               <span className="font-semibold text-foreground">{deal.brandName}</span>
             </p>
           </div>
-
-          {!canCreate && (
-            <Card className="border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-950/20">
-              <CardContent className="p-4">
-                <div className="flex gap-3">
-                  <Crown className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                  <div className="space-y-2">
-                    <p className="font-semibold text-emerald-900 dark:text-emerald-200">Take this deal to a signed agreement</p>
-                    <ul className="text-sm text-emerald-800 dark:text-emerald-300 space-y-1">
-                      <li>✓ Professional agreement</li>
-                      <li>✓ Online client signing</li>
-                      <li>✓ Signed audit record</li>
-                      <li>✓ Continue into invoicing</li>
-                    </ul>
-                    <Button
-                      size="sm"
-                      className="mt-1 text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
-                      onClick={() => openUpgradeModal({ feature: "agreements" })}
-                      data-testid="button-upgrade-pro"
-                    >
-                      <Crown className="w-4 h-4 mr-2 text-amber-300" />
-                      Upgrade to Pro
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Only when the agreement will be created as exclusive (the same rule as `exclusive` in the create call). */}
           {exclusiveDeal && (
@@ -815,11 +772,7 @@ export default function ContractConfirmationPage() {
             </Button>
 
             <p className="text-center text-xs text-muted-foreground">
-              {isPaidPro
-                ? "Included in your Pro plan · unlimited agreements"
-                : onTrial
-                  ? "Included in your free trial · unlimited agreements"
-                  : "Requires DealInSec Pro"}
+              Free on every plan · no cap on agreements
             </p>
           </div>
         </main>

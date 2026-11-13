@@ -63,7 +63,6 @@ export async function createAgreementSignLink(
   if (!canShare(contract)) return { ok: false, status: 409, error: "This agreement is already signed." };
 
   const billing = await getBillingUser(user);
-  if (!hasProAccess(billing)) return { ok: false, status: 403, error: "Agreements are a Pro feature." };
 
   const deal = await storage.getDeal(contract.dealId);
   const settings = await documentLocaleFor(user, contract);

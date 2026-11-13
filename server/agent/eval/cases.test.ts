@@ -345,27 +345,27 @@ describe("15-16. authorization and confirmation", () => {
 
 describe("17-18. failures and retry", () => {
   it("17. a failed step says why, in words, and nothing is changed", async () => {
-    world().billing.set(ORG1, { id: "u1", plan: "free" });
+    // Agreements are free on every plan now, so the refusal worth testing is the member's role, not their billing.
+    const noAgreements = userRow({ orgRole: "CUSTOM", customPermissions: ["deals.create"] });
     const deal = seedDeal(world());
-    const r = await run({ text: "make the agreement", steps: [call("create_agreement", { dealId: deal.id }), say("Agreements need Pro.")] });
-    expect(toolResult(r.provider)).toMatch(/Pro feature/);
+    const r = await run({ user: noAgreements, text: "make the agreement", steps: [call("create_agreement", { dealId: deal.id }), say("Your role can't do that.")] });
+    expect(toolResult(r.provider)).toMatch(/role doesn't allow/);
     expect(r.store.approvals.size).toBe(0);
     expect(world().contracts).toHaveLength(0);
-    expect(r.ev.events.find((e) => e.type === "agent.tool_failed")?.data.message).toMatch(/Pro feature/);
+    expect(r.ev.events.find((e) => e.type === "agent.tool_failed")?.data.message).toMatch(/role doesn't allow/);
   });
 
   it("17b. an approved action that fails is put back for another try, and nothing was written", async () => {
     const deal = seedDeal(world());
     const { store } = await run({ text: "agreement", steps: [call("create_agreement", { dealId: deal.id }), say("Ready.")] });
     const id = [...store.approvals.keys()][0];
-    world().billing.set(ORG1, { id: "u1", plan: "free" }); // the plan lapsed after the request was made
-    const first = await approve(store, id);
+    // Their role was narrowed after they asked, so the approval they already hold is refused on the way through.
+    const first = await approve(store, id, userRow({ id: "u1", orgRole: "CUSTOM", customPermissions: ["deals.create"] }));
     expect(first.ok).toBe(false);
-    expect(first.message).toMatch(/Pro feature/);
+    expect(first.message).toMatch(/role doesn't allow/);
     expect(world().contracts).toHaveLength(0);
     expect(store.approvals.get(id)!.status).toBe("pending");
-    world().billing.set(ORG1, { id: "u1", plan: "pro", planExpiresAt: new Date(Date.now() + 86_400_000) }); // they upgrade
-    expect((await approve(store, id)).ok).toBe(true);
+    expect((await approve(store, id)).ok).toBe(true); // the permission is restored and it goes through
     expect(world().contracts).toHaveLength(1);
     expect(world().deals[0].status).toBe("Active");
   });

@@ -155,7 +155,7 @@ function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | 
           <p className="text-xs text-muted-foreground">
             {DEAL_SUITE_HIDDEN
               ? "Upgrade to Pro for more AI client searches, outreach drafts and coworker tasks, and up to 5 team members"
-              : "Upgrade to Pro for unlimited deals, agreements with online signing, invoices and payment tracking"}
+              : "Upgrade to Pro for more Client Radar searches, more AI outreach drafts and team members"}
           </p>
         </div>
         <Link href="/pricing" onClick={() => trackEvent("upgrade_clicked", { source: "dashboard" })}>

@@ -84,7 +84,7 @@ export const CAPABILITIES: readonly Capability[] = [
   },
   {
     key: "deals", name: "Deals", status: "live", plan: "all",
-    text: "A deal records the client, the engagement model (retainer, fixed price, hourly, milestones and more), the service, the value in the workspace's currency, dates and deliverables. A won lead becomes a deal in one step. The free plan includes 4 deals a month; Pro is unlimited.",
+    text: "A deal records the client, the engagement model (retainer, fixed price, hourly, milestones and more), the service, the value in the workspace's currency, dates and deliverables. A won lead becomes a deal in one step. Deals, and everything that follows from them, are free on every plan with no monthly cap.",
   },
   {
     key: "quotations", name: "Quotations", status: "live", plan: "all",
@@ -140,11 +140,11 @@ const inr = GLOBAL_PLANS.INR;
 const rupees = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 /** Extra team seat, per month (server/razorpayClient.ts getExtraSeatPrice default; product-facts.test.ts checks they agree). */
 export const EXTRA_SEAT_PRICE_INR = 99;
-/** Free plan deals per month (users.monthlyDealCredits default; checked by the test). */
-export const FREE_MONTHLY_DEALS = 4;
+// There is no free-plan deal cap any more (13 Nov 2026): deals, quotations, agreements, invoices and payment
+// tracking are free and unmetered on every plan. users.monthlyDealCredits still exists and still has its old
+// default, but nothing spends it — see POST /api/deals in server/routes.ts.
 
 export const PRICING = {
-  freeMonthlyDeals: FREE_MONTHLY_DEALS,
   proMonthlyInr: inr.monthly!.amount,
   extraSeatInr: EXTRA_SEAT_PRICE_INR,
   /** Who can buy a paid plan today. */
@@ -152,8 +152,8 @@ export const PRICING = {
 } as const;
 
 export const PRICING_LINES: readonly string[] = [
-  `Free plan: ${OB.free.monthlySearches} Client Radar searches a month (up to ${OB.free.maxCompanies} companies each), ${OB.free.monthlyDrafts} AI outreach drafts a month, the leads pipeline, and ${PRICING.freeMonthlyDeals} deals a month, each with its quotation. Agreements, invoices and payment tracking are Pro. Permanent, no card.`,
-  `DealInSec Pro: one plan that includes everything — Client Radar with ${OB.pro.monthlySearches} searches a month (up to ${OB.pro.maxCompanies} companies each), ${OB.pro.monthlyDrafts} AI outreach drafts a month, the leads pipeline, unlimited deals, quotations, agreements with online signing, invoices, payment tracking and ${PRO_INCLUDED_SEATS} team members. ${rupees(PRICING.proMonthlyInr)} a month in India, paid once a month: it does not renew or charge automatically, you pay again to extend. There is no separate plan for Client Radar or the CRM, and no annual plan. Extra team members are ${rupees(PRICING.extraSeatInr)} each a month.`,
+  `Free plan: the work you have already won costs nothing — deals, quotations, agreements signed online, invoices and payment tracking, with no monthly cap on any of them — plus the leads pipeline, ${OB.free.monthlySearches} Client Radar searches a month (up to ${OB.free.maxCompanies} companies each) and ${OB.free.monthlyDrafts} AI outreach drafts a month. Permanent, no card.`,
+  `DealInSec Pro: more of the AI that finds clients — Client Radar with ${OB.pro.monthlySearches} searches a month (up to ${OB.pro.maxCompanies} companies each), ${OB.pro.monthlyDrafts} AI outreach drafts a month, and ${PRO_INCLUDED_SEATS} team members. ${rupees(PRICING.proMonthlyInr)} a month in India, paid once a month: it does not renew or charge automatically, you pay again to extend. The deal-to-invoice flow is free on every plan, so Pro buys research and drafting capacity, not a different product. There is no separate plan for Client Radar or the CRM, and no annual plan. Extra team members are ${rupees(PRICING.extraSeatInr)} each a month.`,
   PRICING.checkout,
   `Checkout charges exactly the listed price (${rupees(PRICING.proMonthlyInr)} for Pro); DealInSec adds no tax on top of it.`,
   "No platform fee or commission on your deal value.",

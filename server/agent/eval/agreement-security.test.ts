@@ -247,13 +247,14 @@ describe("races: the decision is made by the row at write time", () => {
   });
 });
 
-describe("proof upload: role, plan, organization, content, cleanup", () => {
-  it("refused for another organization, a role without agreements.create, and a lapsed plan", async () => {
+describe("proof upload: role, organization, content, cleanup", () => {
+  it("refused for another organization and for a role without agreements.create — but never for the plan", async () => {
     const c = draft();
     expect(await checkProofUpload(OTHER_ORG(), c.id)).toMatchObject({ ok: false, status: 403 });
     expect(await checkProofUpload(ACCOUNTS(), c.id)).toMatchObject({ ok: false, status: 403, code: "FORBIDDEN" });
+    // Agreements are free on every plan (13 Nov 2026). Tenancy and role still decide; the plan no longer does.
     world().billing.set("org-1", { id: "u1", plan: "free" });
-    expect(await checkProofUpload(OWNER(), c.id)).toMatchObject({ ok: false, status: 403, code: "UPGRADE_REQUIRED" });
+    expect(await checkProofUpload(OWNER(), c.id)).toMatchObject({ ok: true });
   });
   it("a file whose content isn't its extension is refused and removed; refusals remove the temporary file too", async () => {
     const c = draft();
@@ -342,8 +343,11 @@ describe("route wiring (source check: the routes call the guarded services)", ()
     expect(create).toContain("...newAgreementLifecycleFields()");
     expect(create).not.toMatch(/\.\.\.req\.body|\.\.\.contractBody/);
   });
-  it("proof upload: Pro and permission, then the pre-check, BEFORE multer accepts the file", () => {
-    expect(line('app.post("/api/contracts/:id/proof"')).toMatch(/requirePro\("agreements"\), requireOrgPermission\("agreements.create"\), proofUploadPrecheck, requireDurableUploads, uploadSingle\("proof"\)/);
+  it("proof upload: permission, then the pre-check, BEFORE multer accepts the file", () => {
+    // No plan gate in the chain any more — agreements are free — but the order of what remains still matters:
+    // nothing may be written to disk before the role and the agreement itself have been checked.
+    expect(line('app.post("/api/contracts/:id/proof"')).toMatch(/requireOrgPermission\("agreements.create"\), proofUploadPrecheck, requireDurableUploads, uploadSingle\("proof"\)/);
+    expect(line('app.post("/api/contracts/:id/proof"')).not.toContain("requirePro");
   });
   it("downloads go through the stored-file check; the proof needs agreement access; nothing serves a stored path directly", () => {
     expect(line('app.get("/api/contracts/:id/proof"')).toContain('requireModuleRead("agreements")');
@@ -485,11 +489,12 @@ describe("follow-up: invoice documents (attachments)", () => {
     await expect(recordAttachmentUpload(OWNER(), inv.id, upload("r.pdf"), "Other")).rejects.toThrow();
     expect(ik.deleted).toEqual(["f1"]);
   });
-  it("upload is refused before the file is accepted for another org or a lapsed plan", async () => {
+  it("upload is refused before the file is accepted for another org — but not for the plan", async () => {
     const inv = seedInvoiceRow();
     expect(await checkAttachmentUpload(OTHER_ORG(), inv.id)).toMatchObject({ ok: false, status: 403 });
+    // Invoices are free on every plan (13 Nov 2026); tenancy still decides.
     world().billing.set("org-1", { id: "u1", plan: "free" });
-    expect(await checkAttachmentUpload(OWNER(), inv.id)).toMatchObject({ ok: false, code: "UPGRADE_REQUIRED" });
+    expect(await checkAttachmentUpload(OWNER(), inv.id)).toMatchObject({ ok: true });
   });
 });
 

@@ -25,11 +25,11 @@ export const LANDING_FAQS: LandingFaq[] = [
   },
   {
     q: "What is included in the free plan?",
-    a: `The free plan is permanent and costs ₹0: ${PRICING.freeMonthlyDeals} new deals a month, each with its quotation; the lead pipeline, where you save researched prospects as leads; ${OB.free.monthlySearches} AI prospect research searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.free.maxCompanies} companies each); outreach drafts you approve; and the dashboard. That is enough to research a prospect, save the lead, create a deal and send a quotation. No card is needed, and you upgrade to Pro only when you want the rest.`,
+    a: `The free plan is permanent and costs ₹0: the whole deal-to-invoice flow — deals, quotations, agreements signed online, invoices and payment tracking — with no monthly cap; the lead pipeline, where you save researched prospects as leads; ${OB.free.monthlySearches} AI prospect research searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.free.maxCompanies} companies each); outreach drafts you approve; and the dashboard. That is enough to research a prospect, save the lead, create a deal and send a quotation. No card is needed, and you upgrade to Pro only when you want the rest.`,
   },
   {
     q: "What does Pro unlock?",
-    a: `DealInSec Pro is ₹${PRICING.proMonthlyInr} a month in India and adds unlimited deals and quotations, agreements your client signs online, invoices generated from the agreement, payment tracking, ${OB.pro.monthlySearches} AI prospect research searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.pro.maxCompanies} companies each) and up to 5 team members. It is one plan: there is no separate fee for AI research or the CRM, and no annual plan.`,
+    a: `DealInSec Pro is ₹${PRICING.proMonthlyInr} a month in India and raises what the AI may do for you: ${OB.pro.monthlySearches} AI prospect research searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.pro.maxCompanies} companies each), ${OB.pro.monthlyDrafts} outreach drafts, and up to 5 team members. The deal-to-invoice flow — deals, quotations, agreements, invoices and payment tracking — is free for everyone, so Pro is about finding more clients, not unlocking the paperwork. It is one plan: there is no separate fee for AI research or the CRM, and no annual plan.`,
   },
   {
     q: "How does AI prospect research work?",

@@ -49,7 +49,7 @@ const RADAR = [
 
 const PIPELINE = [
   { title: "Leads pipeline", text: "New → researching → qualified → contacted → replied → meeting → proposal → won or lost, with next steps, follow-up dates and a do-not-contact list.", plan: "Free" },
-  { title: "Deals", text: "Retainer, fixed price, hourly, milestones and more, in your workspace's currency. Import existing deals from a CSV file.", plan: `Free: ${PRICING.freeMonthlyDeals} a month` },
+  { title: "Deals", text: "Retainer, fixed price, hourly, milestones and more, in your workspace's currency. Import existing deals from a CSV file.", plan: "Free, with no monthly cap" },
   { title: "Quotations", text: "Versioned, generated from the deal, with a link your client opens and accepts online. Protection Check flags missing terms first.", plan: "Free" },
   { title: "Agreements", text: "Standard and custom terms; your client signs online through a link. Electronic acceptance with an audit record, not a certified digital signature.", plan: "Pro" },
   { title: "Invoices and payment follow-ups", text: "Single or split into advance and final, never more than the agreement. Mark payments received; AI drafts a polite reminder you send yourself.", plan: "Pro" },
@@ -186,7 +186,7 @@ export default function PitchPage() {
               <p className="font-semibold">Free</p>
               <p className="mt-2 text-3xl font-bold">₹0 <span className="text-sm font-normal text-muted-foreground">forever, no credit card</span></p>
               <ul className="mt-4 space-y-2 text-sm">
-                {[`${OB.free.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days`, "Leads pipeline and outreach drafts you approve", `${PRICING.freeMonthlyDeals} deals a month, each with its quotation`, `${LG.free.monthlyRuns} AI coworker tasks every ${LEAGUE_WINDOW_DAYS} days`].map((t) => (
+                {[`${OB.free.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days`, "Leads pipeline and outreach drafts you approve", "Deals, quotations, agreements, invoices and payment tracking, uncapped", `${LG.free.monthlyRuns} AI coworker tasks every ${LEAGUE_WINDOW_DAYS} days`].map((t) => (
                   <li key={t} className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />{t}</li>
                 ))}
               </ul>

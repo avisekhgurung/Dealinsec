@@ -258,7 +258,10 @@ const camp = (over: Partial<ZeeCampaign> & { n?: Partial<ZeeCampaign["counts"]> 
 function zee(over: Partial<ZeeDeps> = {}) {
   const facts: string[] = [];
   const deps: ZeeDeps = {
-    briefing: async () => { throw new Error("the money half is hidden: it must not be read"); },
+    // The deal suite is visible again (shared/flags.ts), so Zee reads the money half too. Empty here: these
+    // tests are about campaigns and replies, and an empty briefing keeps them to that.
+    briefing: async () => ({ greetingName: "Asha", attentionCount: 0, generatedAt: NOW.toISOString(), protection: {} as any, nextActions: [],
+      radar: { overdue: { totalMinor: 0, count: 0, invoices: [] }, dueThisWeek: { totalMinor: 0, count: 0, invoices: [] }, readyToInvoice: { totalMinor: 0, count: 0, contracts: [] }, collectibleMinor: 0 } }),
     followUps: async () => ({ ok: true, today: "2026-11-10", overdue: [], dueToday: [] }),
     waitingDrafts: async () => ({ ok: true, items: [] }),
     locale: async () => ({ currency: "INR", locale: "en-IN" }),
@@ -315,13 +318,18 @@ describe("Zee: campaigns and replies in the briefing", () => {
     ] as Partial<ZeeDeps>[]) {
       const out = finish(await zee(over).task.step(ctx("zee.briefing", {}).c, "start"));
       expect(out).toMatchObject({ status: "completed", report: { headline: "All clear today", items: [] } });
-      expect(out.report.counts.map((c) => c.label)).toEqual(["Follow-ups due", "Messages waiting"]);
+      // The money counts come from the briefing and are all zero here; the find-clients counts sit between them.
+      expect(out.report.counts.map((c) => c.label)).toEqual(["Overdue invoices", "Follow-ups due", "Messages waiting", "Due this week", "Ready to invoice"]);
     }
   });
   it("a campaign with nothing to say adds nothing but its zero count", async () => {
     const out = finish(await zee({ campaigns: async () => ({ ok: true, campaigns: [camp({ sending: true })] }), replies: async () => ({ ok: true, counts: { needs_review: 0, interested: 0 } }) }).task.step(ctx("zee.briefing", {}).c, "start"));
     expect(out.report.items).toEqual([]);
     expect(out.report.headline).toBe("All clear today");
-    expect(out.report.counts).toEqual([{ label: "Follow-ups due", value: 0 }, { label: "Messages waiting", value: 0 }, { label: "Replies to read", value: 0 }, { label: "Campaign drafts to review", value: 0 }]);
+    expect(out.report.counts).toEqual([
+      { label: "Overdue invoices", value: 0 }, { label: "Follow-ups due", value: 0 }, { label: "Messages waiting", value: 0 },
+      { label: "Replies to read", value: 0 }, { label: "Campaign drafts to review", value: 0 },
+      { label: "Due this week", value: 0 }, { label: "Ready to invoice", value: 0 },
+    ]);
   });
 });

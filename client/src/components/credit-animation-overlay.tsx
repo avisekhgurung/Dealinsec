@@ -2,10 +2,10 @@
  * CreditAnimationOverlay
  *
  * Full-screen modal that plays a 3-phase animation while an agreement is
- * created (agreements are a Pro feature in the subscription-first model, so
- * there is no credit deduction to animate — just a premium progress flow):
+ * created (nothing is charged or deducted for an agreement, so there is no
+ * balance to animate — just a progress flow):
  *
- *   Phase 1 — "Preparing Agreement" (Pro badge pulse)
+ *   Phase 1 — "Preparing Agreement" (badge pulse)
  *   Phase 2 — "Creating Agreement"  (progress bar fill)
  *   Phase 3 — "Agreement Created!"  (green burst, auto-dismiss)
  *

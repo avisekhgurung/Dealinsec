@@ -1127,7 +1127,7 @@ export default function SettingsPage() {
                   <p className="text-sm text-muted-foreground max-w-md">
                     {DEAL_SUITE_HIDDEN
                       ? "Pro unlocks more AI client searches, outreach drafts and coworker tasks — and room for up to 5 people if you ever need help."
-                      : "The free plan covers 4 deals a month with their quotations. Pro adds signed agreements, invoices and payment tracking — and room for up to 5 people if you ever need help."}
+                      : "Deals, quotations, signed agreements, invoices and payment tracking are free, with no monthly cap. Pro adds a larger Client Radar research allowance, more AI outreach drafts — and room for up to 5 people if you ever need help."}
                   </p>
                 ) : (
                   <p className="text-sm text-muted-foreground max-w-md">

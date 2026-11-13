@@ -7,14 +7,17 @@
  * WRITES are gated by role permissions (shared/permissions.ts). Subscription
  * entitlements resolve through the org OWNER's user row, where billing lives:
  *
- *   free owner  -> org has 4 Deal Credits/month, 1 seat
- *   Pro owner   -> unlimited workflow, 5 seats (+ purchased extra seats)
- *   Deal Boost  -> unlimited deals+quotations for the whole org
+ *   free owner  -> 1 seat, the free Client Radar and draft allowances
+ *   Pro owner   -> 5 seats (+ purchased extra seats), the Pro allowances
+ *
+ * Since 13 Nov 2026 the deal-to-invoice flow is free on every plan, so no
+ * route gates on the plan and no Deal Credit is spent. Deal Boost rows survive
+ * but grant nothing that everyone does not already have.
  *
  * Error contract (client's parseApiError routes these):
- *   403 { code: "UPGRADE_REQUIRED", feature }    — org's plan lacks the feature
+ *   403 { code: "UPGRADE_REQUIRED", feature }    — unused today; see requirePro
  *   403 { code: "FORBIDDEN", permission }        — member's role lacks the action
- *   402 { code: "NO_CREDITS", feature: "deals" } — org's free limit hit
+ *   402 { code: "NO_CREDITS", feature: "deals" } — no longer returned
  */
 import type { RequestHandler } from "express";
 import { hasProAccess, type User } from "@shared/schema";
@@ -75,7 +78,14 @@ export const requireLinkedRead: RequestHandler = (req: any, res, next) => {
 /** Gate a route to orgs whose OWNER has Pro ACCESS — a paid subscription
  *  OR an active 7-day trial (hasProAccess is the one entitlement helper;
  *  display code is what keeps them looking different). Must run AFTER
- *  isAuthenticated. Reads never go through this. */
+ *  isAuthenticated. Reads never go through this.
+ *
+ *  NO ROUTE USES THIS TODAY. On 13 Nov 2026 the deal-to-invoice flow — its
+ *  only callers — became free on every plan, and what DealInSec charges for
+ *  (Client Radar searches, outreach drafts) is metered by allowance rather
+ *  than gated by plan. Kept, and still covered by
+ *  server/billing/payment-orders.pg.test.ts, because it is the audited way to
+ *  gate a route on the OWNER's plan should something ever need it again. */
 export function requirePro(feature: GatedFeature): RequestHandler {
   return async (req: any, res, next) => {
     try {

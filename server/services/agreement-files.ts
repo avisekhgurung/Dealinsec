@@ -62,13 +62,12 @@ async function firstBytes(file: string, n = 16): Promise<Uint8Array> {
 // ── Proof upload ─────────────────────────────────────────────────────────
 
 /**
- * Everything decidable before a file is accepted: role, plan, organization,
- * and that the client hasn't already signed online. Runs before multer writes
+ * Everything decidable before a file is accepted: role, organization, and
+ * that the client hasn't already signed online. Runs before multer writes
  * the upload, and again after it (the agreement may have changed meanwhile).
  */
 export async function checkProofUpload(user: User, contractId: number): Promise<{ ok: true; contract: Contract } | Fail> {
   if (!memberCan(user, "agreements.create")) return fail(403, "FORBIDDEN", "Your role doesn't allow uploading signed proof.");
-  if (!hasProAccess(await getBillingUser(user))) return fail(403, "UPGRADE_REQUIRED", "Creating agreements requires DealInSec Pro");
   if (!Number.isFinite(contractId)) return fail(404, "not_found", "Contract not found");
   const contract = await storage.getContract(contractId);
   if (!contract) return fail(404, "not_found", "Contract not found");
@@ -224,7 +223,6 @@ export function profileImageUpdateAllowed(user: User, field: ProfileImageField, 
 /** Before multer accepts the file: the invoice exists and is in this organization (role and plan are route middleware). */
 export async function checkAttachmentUpload(user: User, invoiceId: number): Promise<{ ok: true; invoice: BrandInvoice } | Fail> {
   if (!memberCan(user, "invoices.create")) return fail(403, "FORBIDDEN", "Your role doesn't allow adding invoice documents.");
-  if (!hasProAccess(await getBillingUser(user))) return fail(403, "UPGRADE_REQUIRED", "Generating invoices requires DealInSec Pro");
   const invoice = Number.isFinite(invoiceId) ? await storage.getBrandInvoice(invoiceId) : undefined;
   if (!invoice) return fail(404, "not_found", "Invoice not found");
   if (!inOrg(invoice, user)) return fail(403, "forbidden", "Access denied");

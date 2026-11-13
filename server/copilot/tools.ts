@@ -524,31 +524,15 @@ export async function executeCreateDeal(rawArgs: any, user: User) {
   const parsed = { data: built.data };
   const { currency, locale } = built.settings;
 
-  // Same credit gate as POST /api/deals: spend AFTER validation; compensate
-  // if the insert fails so a crash never eats a credit.
-  const billing = await getBillingUser(user);
-  let creditSpent = false;
-  if (!hasProAccess(billing) && !hasActiveDealBoost(billing)) {
-    await storage.ensureMonthlyCredits(billing.id);
-    const spend = await storage.spendDealCredit(billing.id);
-    if (!spend.ok) {
-      return { ok: false as const, message: "Your organization has used all its Deal Credits for this month — upgrade to Pro for unlimited deals." };
-    }
-    creditSpent = true;
-  }
-  try {
-    const deal = await storage.createDeal(parsed.data);
-    logOrgActivity(user, "created", "deal", deal.id, `Deal: ${deal.dealTitle || deal.brandName} (via Copilot)`);
-    return {
-      ok: true as const,
-      message: `Deal created: "${deal.dealTitle}" for ${deal.brandName} — ${formatMoney(deal.dealAmountMinor, currency, locale)}. Next step: generate its quotation.`,
-      route: `/deals/${deal.id}`,
-      dealId: deal.id,
-    };
-  } catch (err) {
-    if (creditSpent) await storage.regrantDealCredit(billing.id).catch(() => {});
-    throw err;
-  }
+  // No credit is spent: deals are free for every plan (see POST /api/deals).
+  const deal = await storage.createDeal(parsed.data);
+  logOrgActivity(user, "created", "deal", deal.id, `Deal: ${deal.dealTitle || deal.brandName} (via Copilot)`);
+  return {
+    ok: true as const,
+    message: `Deal created: "${deal.dealTitle}" for ${deal.brandName} — ${formatMoney(deal.dealAmountMinor, currency, locale)}. Next step: generate its quotation.`,
+    route: `/deals/${deal.id}`,
+    dealId: deal.id,
+  };
 }
 
 // Mirrors POST /api/deals/:id/quote (server/routes.ts) — keep in sync with
@@ -583,10 +567,6 @@ export async function executeCreateQuotation(dealId: number, user: User) {
 export async function buildAgreementCandidate(rawArgs: any, user: User) {
   if (!memberCan(user, "agreements.create")) {
     return { ok: false as const, message: "Your role doesn't allow creating agreements. Ask your organization owner." };
-  }
-  const billing = await getBillingUser(user);
-  if (!hasProAccess(billing)) {
-    return { ok: false as const, message: "Agreements are a Pro feature — upgrade to generate one." };
   }
   const dealId = Number(rawArgs?.dealId);
   if (!Number.isFinite(dealId)) return { ok: false as const, message: "I need a deal to create the agreement for." };
@@ -668,10 +648,6 @@ export async function executeCreateAgreement(rawArgs: any, user: User) {
 export async function buildInvoiceCandidate(rawArgs: any, user: User) {
   if (!memberCan(user, "invoices.create")) {
     return { ok: false as const, message: "Your role doesn't allow creating invoices. Ask your organization owner." };
-  }
-  const billing = await getBillingUser(user);
-  if (!hasProAccess(billing)) {
-    return { ok: false as const, message: "Invoices are a Pro feature — upgrade to create one." };
   }
   const dealId = Number(rawArgs?.dealId);
   if (!Number.isFinite(dealId)) return { ok: false as const, message: "I need a deal to invoice." };

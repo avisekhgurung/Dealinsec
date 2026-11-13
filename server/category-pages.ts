@@ -12,10 +12,11 @@
  * developers, writers, video editors & photographers, marketers and
  * consultants. /freelancer-invoice-software is the flagship; the old
  * /interior-design-software page is gone (301'd to the flagship elsewhere),
- * so nothing here may link to it. Pricing on every page: Free ₹0 (4 deals a
- * month, quotations only — agreements, invoices and payment tracking are Pro
- * via requirePro), Pro ₹299/month. No founding offer, no Deal
- * Boost, no team seats in marketing copy.
+ * so nothing here may link to it. Pricing on every page: Free ₹0, covering the
+ * whole deal-to-invoice flow with no monthly cap (13 Nov 2026 — nothing in it
+ * is gated on the plan any more), Pro ₹299/month for the larger Client Radar
+ * and outreach-draft allowances. No founding offer, no Deal Boost, no team
+ * seats in marketing copy.
  *
  * Same architecture as /tools and /blog: complete server-rendered HTML,
  * registered BEFORE the SPA catch-all. Every path here must ALSO be in
@@ -359,7 +360,7 @@ export const PAGES: CategoryPage[] = [
     <tr><td><b>Getting paid</b></td><td>You remember, then chase awkwardly</td><td>Overdue list, plus a drafted reminder in the tone you pick</td></tr>
     <tr><td><b>Cost</b></td><td>—</td><td>Free plan for quotations; Pro ₹299/month</td></tr>
   </table></div>
-  <div class="callout honest"><b>What it costs, plainly</b><p>Free is ₹0: 4 deals a month, each with its quotation. Pro is ₹299/month, paid once a month with no auto-renewal, and adds Client Radar with a larger research allowance, e-signed agreements, invoices, payment tracking and unlimited deals. The free plan needs no card. DealInSec takes no percentage of your project value. Just need one invoice today? The <a href="/tools/gst-invoice-generator">free GST invoice generator</a> and <a href="/tools/quotation-maker">quotation maker</a> need no sign-up.</p></div>
+  <div class="callout honest"><b>What it costs, plainly</b><p>Free is ₹0, and it covers the whole job: deals, quotations, e-signed agreements, invoices and payment tracking, with no monthly cap. Pro is ₹299/month, paid once a month with no auto-renewal, and adds a larger Client Radar research allowance, more AI outreach drafts and team members. The free plan needs no card. DealInSec takes no percentage of your project value. Just need one invoice today? The <a href="/tools/gst-invoice-generator">free GST invoice generator</a> and <a href="/tools/quotation-maker">quotation maker</a> need no sign-up.</p></div>
   <p class="muted" style="font-size:14px;margin-top:10px">Guides: <a href="/blog/advance-payment-terms">advance payment terms</a> · <a href="/blog/payment-reminder-message-to-client">payment reminder messages</a> · <a href="/blog/how-to-make-a-quotation-online">making a quotation online</a>.</p>
 </div></section>`,
     faq: [
@@ -373,7 +374,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "How much does it cost?",
-        a: "Free is ₹0 for 4 deals a month, each with its quotation. Pro is ₹299/month and adds e-signed agreements, invoices, payment tracking and unlimited deals. The free plan needs no card, and DealInSec takes no percentage of your project value.",
+        a: "Free is ₹0 and covers deals, quotations, e-signed agreements, invoices and payment tracking, with no monthly cap. Pro is ₹299/month and adds a larger Client Radar research allowance, more AI outreach drafts and team members. The free plan needs no card, and DealInSec takes no percentage of your project value.",
       },
       {
         q: "Can I take an advance and bill in milestones?",
@@ -433,7 +434,7 @@ export const PAGES: CategoryPage[] = [
     faq: [
       {
         q: "Is DealInSec a free Refrens alternative?",
-        a: "DealInSec has a free plan (4 deals a month, each with its quotation) with no card, plus free no-sign-up tools (GST invoice, quotation maker, bill maker). Agreements, invoices and payment tracking are on Pro at ₹299/month. It isn't a clone of Refrens, though — it's built to run the whole deal, not just billing, so compare on the job you need done.",
+        a: "DealInSec has a free plan with no card that covers the whole job — deals, quotations, agreements, invoices and payment tracking, with no monthly cap — plus free no-sign-up tools (GST invoice, quotation maker, bill maker). Pro, at ₹299/month, buys more AI client research, not the paperwork. It isn't a clone of Refrens, though — it's built to run the whole deal, not just billing, so compare on the job you need done.",
       },
       {
         q: "Why would a freelancer choose DealInSec over Refrens?",
@@ -506,7 +507,7 @@ export const PAGES: CategoryPage[] = [
       "Quotation software for Indian freelancers: itemised quotations with revision rounds and advance terms, a link your client can accept online, and the agreement and invoice from the same deal. Free plan; Pro ₹299/month.",
     h1: "Send clear quotations that help you win work",
     sub: "Make professional, numbered quotations for your clients in minutes and share a link they can open and accept online. When they say yes, create the agreement and the invoice from the same deal, with the same figures.",
-    chips: ["Made for freelancers", "Accepted online", "Free plan · 4 deals a month", "Pro ₹299/month"],
+    chips: ["Made for freelancers", "Accepted online", "Free plan · no monthly cap", "Pro ₹299/month"],
     shortLabel: "Quotation Software",
     sections: `
 <section><div class="wrap">
@@ -538,7 +539,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "Is there a free version?",
-        a: "Two, honestly: the free quotation maker tool needs no account at all, and every new DealInSec account starts on a free plan (no card) covering 4 deals a month, each with a quotation.",
+        a: "Two, honestly: the free quotation maker tool needs no account at all, and every new DealInSec account starts on a free plan (no card) covering deals and their quotations with no monthly cap.",
       },
       {
         q: "Does it handle GST on quotations?",
@@ -593,7 +594,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "What does it cost?",
-        a: "Agreements are part of Pro: ₹299/month, with unlimited deals, agreements, invoices and payment tracking. The free plan, with no card, covers 4 deals a month with quotations.",
+        a: "Agreements are free, on every plan, along with deals, quotations, invoices and payment tracking, with no monthly cap and no card. Pro, at ₹299/month, adds a larger Client Radar research allowance, more AI outreach drafts and team members.",
       },
       {
         q: "Can my client sign without creating an account?",
@@ -683,7 +684,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "Is there a free plan?",
-        a: "The free plan covers 4 deals a month, each with its quotation. Invoices, agreements and payment tracking are Pro — ₹299/month. The free plan needs no card, so you can run real deals and quotations before deciding.",
+        a: "The free plan covers deals, quotations, invoices, agreements and payment tracking, with no monthly cap and no card, so you can run real client work before deciding. Pro, at ₹299/month, adds a larger Client Radar research allowance, more AI outreach drafts and team members.",
       },
       {
         q: "What do I do when a client hasn't paid?",
@@ -730,7 +731,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "What does it cost?",
-        a: "E-signed agreements are part of Pro — ₹299/month, with unlimited agreements. The free plan, with no card, covers 4 deals a month with quotations only.",
+        a: "E-signed agreements are free, on every plan, with no monthly cap and no card — along with deals, quotations, invoices and payment tracking. Pro, at ₹299/month, buys more AI client research.",
       },
     ],
   },
@@ -826,7 +827,7 @@ export const PAGES: CategoryPage[] = [
       "A simple CRM for Indian freelancers. Manage leads and deals, follow up on time, send quotations and invoice clients from one workspace. Free plan; Pro ₹299/month.",
     h1: "A simple CRM for freelancers in India",
     sub: "Keep every potential client, conversation and deal in one place. Know whom to follow up with today, send a quotation from the deal, and carry the same details through to the agreement and the invoice.",
-    chips: ["Leads and deals", "Follow-up dates and next steps", "Quotations accepted online", `Free plan · ${PRICING.freeMonthlyDeals} deals a month`, `Pro ₹${PRICING.proMonthlyInr}/month`],
+    chips: ["Leads and deals", "Follow-up dates and next steps", "Quotations accepted online", "Free plan · deals and invoices included", `Pro ₹${PRICING.proMonthlyInr}/month`],
     shortLabel: "CRM for Freelancers",
     sections: `
 <section><div class="wrap">
@@ -885,7 +886,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "What does it cost?",
-        a: `The free plan, with no credit card, includes the lead pipeline, ${PRICING.freeMonthlyDeals} deals a month with their quotations and ${OB.free.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days. Pro is ₹${PRICING.proMonthlyInr} a month in India and adds unlimited deals, agreements signed online, invoices, payment tracking and team members.`,
+        a: `The free plan, with no credit card, includes the lead pipeline, ${OB.free.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days, and the whole deal-to-invoice flow — deals, quotations, agreements signed online, invoices and payment tracking — with no monthly cap. Pro is ₹${PRICING.proMonthlyInr} a month in India and raises the AI allowances to ${OB.pro.monthlySearches} searches and ${OB.pro.monthlyDrafts} drafts, with team members included.`,
       },
       {
         q: "Can I bring my existing deals?",
@@ -1072,7 +1073,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "Can I use DealInSec outside India?",
-        a: "Yes. The free plan, which covers 4 deals a month with their quotations and needs no card, is open in every country, in 50 currencies. Paid plans can currently be bought in India only.",
+        a: "Yes. The free plan, which covers deals, quotations, agreements, invoices and payment tracking with no monthly cap and needs no card, is open in every country, in 50 currencies. Paid plans can currently be bought in India only.",
       },
       {
         q: "Is the client's signature legally valid?",
@@ -1189,7 +1190,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "Can I use DealInSec outside India?",
-        a: "Yes. The free plan, which covers 4 deals a month with their quotations and needs no card, is open in every country, in 50 currencies. Paid plans can currently be bought in India only.",
+        a: "Yes. The free plan, which covers deals, quotations, agreements, invoices and payment tracking with no monthly cap and needs no card, is open in every country, in 50 currencies. Paid plans can currently be bought in India only.",
       },
       {
         q: "Is the brand's signature legally valid?",
@@ -1622,7 +1623,7 @@ export function renderCategoryPage(p: CategoryPage, siblings: RelatedLink[]): st
         ]
       : // Never advertise a price that cannot be bought from where the reader is. The description leads with client
         // research, because this is the entity description answer engines read off /about and the global pages.
-        [{ "@type": "Offer", name: "Free plan", price: "0", priceCurrency: "USD", description: `${OB.free.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days, ${OB.free.monthlyDrafts} AI outreach drafts you approve and send yourself, the leads pipeline, and ${PRICING.freeMonthlyDeals} deals a month with quotations. Available in every country.` }];
+        [{ "@type": "Offer", name: "Free plan", price: "0", priceCurrency: "USD", description: `${OB.free.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days, ${OB.free.monthlyDrafts} AI outreach drafts you approve and send yourself, the leads pipeline, and the whole deal-to-invoice flow with no monthly cap. Available in every country.` }];
   const jsonLd: object[] = [
     {
       "@context": "https://schema.org",

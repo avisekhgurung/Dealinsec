@@ -20,9 +20,10 @@ describe("isFirstGoal", () => {
 });
 
 describe("checklistFor ordering", () => {
-  it("find_clients is the whole journey while the deal suite is hidden: research, lead, first message", () => {
-    expect(ids("find_clients")).toEqual(["run_search", "add_lead", "first_message"]);
-    expect(checklistFor("find_clients", ZERO, ALL).every((x) => !x.discovery)).toBe(true);
+  it("find_clients starts at research and carries on into the work it wins", () => {
+    expect(ids("find_clients")).toEqual(["run_search", "add_lead", "first_message", "first_deal", "quote_flow"]);
+    // Finding clients is the goal; the paperwork that follows is the suggestion at the end, not part of it.
+    expect(checklistFor("find_clients", ZERO, ALL).filter((x) => x.discovery).map((x) => x.id)).toEqual(["quote_flow"]);
   });
   it("manage_deals starts from the pipeline", () => {
     expect(ids("manage_deals")).toEqual(["add_pipeline", "first_deal", "send_quote", "run_search"]);
@@ -64,8 +65,9 @@ describe("permissions", () => {
     expect(ids("get_paid", ZERO, invoicesOnly)).toEqual(["invoice", "record_payment"]);
     expect(ids("find_clients", ZERO, invoicesOnly)).toEqual([]);
   });
-  it("hides outbound and leads steps without access", () => {
-    expect(ids("find_clients", ZERO, { ...ALL, outbound: false, leads: false })).toEqual([]);
+  it("hides outbound and leads steps without access, leaving only what the person may reach", () => {
+    expect(ids("find_clients", ZERO, { ...ALL, outbound: false, leads: false })).toEqual(["first_deal", "quote_flow"]);
+    expect(ids("find_clients", ZERO, { ...ALL, outbound: false, leads: false, deals: false })).toEqual([]);
   });
   it("quotation steps follow deals unless quotations is given", () => {
     expect(ids("manage_deals", ZERO, { ...ALL, deals: false })).toEqual(["add_pipeline", "run_search"]);
@@ -100,7 +102,7 @@ describe("unknown facts", () => {
 describe("destinationFor", () => {
   it("lands each goal where its first step is", () => {
     expect(destinationFor("find_clients")).toBe("/outbound");
-    expect(destinationFor("get_paid")).toBe("/outbound"); // deal suite hidden: the deal-first landing is gone
+    expect(destinationFor("get_paid")).toBe("/deals/new"); // the deal suite is free and reachable again
     expect(destinationFor("manage_deals")).toBe("/leads");
     expect(destinationFor(null)).toBe("/outbound"); // no goal lands on the product's promise: finding clients
   });

@@ -675,7 +675,7 @@ ${ctaInline("Need the real thing?", "Make a genuine, professional quotation in f
       },
       {
         q: "Do freelancers need deal management software, or only companies?",
-        a: "The problem is per-deal, not per-headcount. A freelancer running four client projects has four quotations, four scopes and four payments to keep straight — the same failure modes as a large firm, just smaller. Free plans (DealInSec's covers 4 deals a month) exist for exactly this stage.",
+        a: "The problem is per-deal, not per-headcount. A freelancer running four client projects has four quotations, four scopes and four payments to keep straight — the same failure modes as a large firm, just smaller. Free plans (DealInSec's covers the whole deal-to-invoice flow) exist for exactly this stage.",
       },
       {
         q: "Is Excel enough for managing deals?",
@@ -825,7 +825,7 @@ ${ctaInline("Replace the template first — it's free", "The free quotation make
       },
       {
         q: "Is there completely free quotation software?",
-        a: "Yes. DealInSec's free quotation maker needs no account at all, and the app's free plan covers 4 deals a month with no card. Several competitors also offer free tiers — check what each caps (documents, users, or features).",
+        a: "Yes. DealInSec's free quotation maker needs no account at all, and the app's free plan covers deals, quotations, agreements, invoices and payment tracking with no monthly cap and no card. Several competitors also offer free tiers — check what each caps (documents, users, or features).",
       },
       {
         q: "Should quotation software handle GST?",
@@ -869,7 +869,7 @@ ${ctaInline("Replace the template first — it's free", "The free quotation make
   <li><b>Wrong pick:</b> you sell inventory (you need stock-aware billing — the Vyapar shape), you need full double-entry accounting (that's an accounting package), or you only ever need one quote a year (use our <a href="/tools/quotation-maker">free maker</a> and pay nobody).</li>
 </ul>
 
-${ctaInline("Test it on one real deal", "Start free, no card: create the deal and its quotation, and judge it on your own client. Pro adds the agreement and invoices.", SIGNUP, "Start free →")}
+${ctaInline("Test it on one real deal", "Start free, no card: create the deal, its quotation, the agreement and the invoice, and judge it on your own client. All of that is free.", SIGNUP, "Start free →")}
 
 <h2>How to run the test</h2>
 <ol>

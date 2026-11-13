@@ -122,7 +122,7 @@ export function checklistFor(goal: FirstGoal | null, facts: Facts, can: Checklis
         title: "Approve and send a first message",
         detail: "Review the drafted message, send it from your own email app, then mark it sent.",
       },
-      // With the deal suite hidden (shared/flags.ts), finding and winning the conversation IS the journey.
+      // Finding and winning the conversation is the goal; what follows is offered as the next thing to try.
       ...(DEAL_SUITE_HIDDEN ? [] : [
         firstDeal("Turn a reply into a deal", "When a company is interested, create a deal for the work."),
         {

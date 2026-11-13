@@ -665,7 +665,7 @@ function brandModal(): string {
       <div style="padding:20px">
         <ul class="bm-list">
           <li>Remove the &ldquo;Made with DealInSec&rdquo; footer</li>
-          <li><b>${PRICING.freeMonthlyDeals} free deals every month</b> &mdash; run real deals with quotations</li>
+          <li><b>Deals and invoices, free</b> &mdash; run real deals with quotations, with no monthly cap</li>
           <li>Agreements signed online, invoices and payment tracking with Pro &mdash; paid plans can currently be bought in India (₹${PRICING.proMonthlyInr}/month)</li>
         </ul>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">

@@ -23,10 +23,8 @@ import {
   Search, Plus, ArrowRight, FileText, FileCheck, Receipt, Crown,
   AlertTriangle, Scissors,
 } from "lucide-react";
-import { hasProAccess } from "@shared/schema";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
 import { isAgreementSigned } from "@shared/agreement-lifecycle";
-import { useAuth } from "@/hooks/useAuth";
 import { useMoney } from "@/hooks/use-locale";
 import { useUpgradeModal } from "@/components/upgrade-modal";
 import { moneyIcon } from "@/components/money-icon";
@@ -69,7 +67,6 @@ export function PickParentDialog({
   kind, open, onOpenChange,
 }: { kind: PickKind; open: boolean; onOpenChange: (v: boolean) => void }) {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
   const audience = useAudience();
   const { money, settings: moneySettings } = useMoney();
   const { openUpgradeModal } = useUpgradeModal();
@@ -84,7 +81,6 @@ export function PickParentDialog({
   const { data: invoices = [], isLoading: l4 } = useQuery<BrandInvoice[]>({ queryKey: ["/api/brand-invoices"], enabled });
   const loading = l1 || l2 || l3 || l4;
 
-  const proBlocked = (kind === "agreement" || kind === "invoice") && !hasProAccess(user);
 
   const { rows, excludedNote } = useMemo(() => {
     const quotedDealIds = new Set(quotes.map((q) => q.dealId));
@@ -225,26 +221,7 @@ export function PickParentDialog({
               <DialogDescription>{copy.description}</DialogDescription>
             </DialogHeader>
 
-            {proBlocked ? (
-              <div className="text-center py-6">
-                <Crown className="w-8 h-8 mx-auto text-amber-500 mb-2" />
-                <p className="font-semibold text-sm">
-                  {kind === "agreement" ? "Agreements" : "Invoices"} are a Pro feature
-                </p>
-                <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
-                  {/* In-app invoices don't calculate tax, so they are never called "GST-ready". */}
-                  Upgrade to Pro for the
-                  full workflow — agreements,{" "}
-                  invoices and payment tracking.
-                </p>
-                <Button
-                  className="mt-4 gradient-btn text-white font-semibold"
-                  onClick={() => { close(); openUpgradeModal({ feature: kind === "agreement" ? "agreements" : "invoices" }); }}
-                >
-                  See plans
-                </Button>
-              </div>
-            ) : loading ? (
+            {loading ? (
               <div className="space-y-2 py-2">
                 {[0, 1, 2].map((i) => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
               </div>

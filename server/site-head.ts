@@ -36,6 +36,7 @@ export const ORGANIZATION_SAME_AS: readonly string[] = [
 ];
 
 import { OUTBOUND_ALLOWANCE_DEFAULTS as OB, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
+import { PRO_INCLUDED_SEATS } from "@shared/permissions";
 
 const escapeAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const json = (data: unknown) => `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>`;
@@ -53,8 +54,8 @@ export function homeSchemas(): string {
       url: `${SITE_ORIGIN}/`,
       description: `${ONE_LINER} For ${AUDIENCE_LINE}. ${SUMMARY}`,
       offers: [
-        { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD", description: `${OB.free.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.free.maxCompanies} companies each), the leads pipeline, and ${PRICING.freeMonthlyDeals} deals a month, each with its quotation. Available in every country.` },
-        { "@type": "Offer", name: "Pro Monthly", price: String(PRICING.proMonthlyInr), priceCurrency: "INR", eligibleRegion: india, description: `${OB.pro.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.pro.maxCompanies} companies each), unlimited deals, agreements, invoices and payment tracking. Paid monthly in India; it does not renew automatically.` },
+        { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD", description: `${OB.free.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.free.maxCompanies} companies each), the leads pipeline, and the whole deal-to-invoice flow — deals, quotations, agreements signed online, invoices and payment tracking — with no monthly cap. Available in every country.` },
+        { "@type": "Offer", name: "Pro Monthly", price: String(PRICING.proMonthlyInr), priceCurrency: "INR", eligibleRegion: india, description: `${OB.pro.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.pro.maxCompanies} companies each), ${OB.pro.monthlyDrafts} AI outreach drafts and ${PRO_INCLUDED_SEATS} team members. The deal-to-invoice flow is free on every plan. Paid monthly in India; it does not renew automatically.` },
       ],
       publisher: { "@id": ORGANIZATION_ID },
     }),

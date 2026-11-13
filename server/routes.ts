@@ -11,7 +11,7 @@ import { bankRoutingLabel, invoiceTaxProfile } from "@shared/invoice-tax";
 import { eq, sql } from "drizzle-orm";
 import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./auth";
-import { requirePro, requireOrgPermission, withOrg, getBillingUser, logOrgActivity , requireModuleRead, requireLinkedRead} from "./entitlements";
+import { requireOrgPermission, withOrg, getBillingUser, logOrgActivity , requireModuleRead, requireLinkedRead} from "./entitlements";
 import { maybeStartTrial } from "./trial";
 import { registerCopilotRoutes } from "./copilot/routes";
 import { registerAgentRoutes } from "./agent/routes";
@@ -761,47 +761,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // wording), as the form does. A type the caller sent is never overridden.
       if (req.body.dealType === undefined && eng.serviceCategory) parsed.data.dealType = dealTypeForService(eng.serviceCategory);
 
-      // The ORG's plan and credit pool live on its OWNER's user row. Free
-      // plan: 1 Deal Credit = this deal + its quotation; Pro (paid OR
-      // trial — hasProAccess) and Deal Boost are unlimited for every
-      // member. A trialist must NOT burn monthly credits: they'd hit 402
-      // mid-trial and face day 8 at zero with a ~23-day wait. Spend
-      // happens AFTER validation so a 400 never burns a credit.
-      const billing = await getBillingUser(req.user);
-      let creditSpent = false;
-      if (!hasProAccess(billing) && !hasActiveDealBoost(billing)) {
-        await storage.ensureMonthlyCredits(billing.id);
-        const spend = await storage.spendDealCredit(billing.id);
-        if (!spend.ok) {
-          const fresh = await storage.getUser(billing.id);
-          const credits = getDealCredits(fresh);
-          return res.status(402).json({
-            code: "NO_CREDITS",
-            feature: "deals",
-            error: "Your organization has used all its Deal Credits for this month",
-            credits: {
-              monthly: credits.monthly,
-              purchased: credits.purchased,
-              resetsAt: fresh?.monthlyCreditsResetAt ?? null,
-            },
-          });
-        }
-        creditSpent = true;
-      }
-
-      try {
-        const deal = await storage.createDeal({
-          ...parsed.data,
-          ...engagement,
-          brandTerms: brandTermsForDeal(parsed.data.dealType, parsed.data.brandTerms),
-        });
-        logOrgActivity(req.user, "created", "deal", deal.id, `Deal: ${deal.dealTitle || deal.brandName}`);
-        res.status(201).json(deal);
-      } catch (insertError) {
-        // Rare compensation path: the credit was taken but the insert failed.
-        if (creditSpent) await storage.regrantDealCredit(billing.id).catch(() => {});
-        throw insertError;
-      }
+      // Free for everyone since 13 Nov 2026: no Deal Credit is spent and no
+      // plan is checked here, or on quotations, agreements, invoices and
+      // payment tracking. DealInSec charges for the AI that costs money to
+      // run — Client Radar searches and outreach drafts — not for the records
+      // kept afterwards, which cost nothing to serve.
+      const deal = await storage.createDeal({
+        ...parsed.data,
+        ...engagement,
+        brandTerms: brandTermsForDeal(parsed.data.dealType, parsed.data.brandTerms),
+      });
+      logOrgActivity(req.user, "created", "deal", deal.id, `Deal: ${deal.dealTitle || deal.brandName}`);
+      res.status(201).json(deal);
     } catch (error) {
       console.error("Deal creation error:", error);
       res.status(500).json({ error: "Failed to create deal" });
@@ -983,7 +954,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/contracts", isAuthenticated, requirePro("agreements"), requireOrgPermission("agreements.create"), async (req: any, res) => {
+  app.post("/api/contracts", isAuthenticated, requireOrgPermission("agreements.create"), async (req: any, res) => {
     try {
       const userId = req.user.id;
 
@@ -1091,7 +1062,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       sendInternalError(res, "proof", error, "upload_failed", "Failed to upload proof");
     }
   };
-  app.post("/api/contracts/:id/proof", isAuthenticated, requirePro("agreements"), requireOrgPermission("agreements.create"), proofUploadPrecheck, requireDurableUploads, uploadSingle("proof"), async (req: any, res) => {
+  app.post("/api/contracts/:id/proof", isAuthenticated, requireOrgPermission("agreements.create"), proofUploadPrecheck, requireDurableUploads, uploadSingle("proof"), async (req: any, res) => {
     try {
       const r = await recordProofUpload(req.user, parseInt(req.params.id, 10), req.file);
       if (!r.ok) return res.status(r.status).json({ code: r.code, error: r.error });
@@ -1339,7 +1310,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/brand-invoices", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.create"), async (req: any, res) => {
+  app.post("/api/brand-invoices", isAuthenticated, requireOrgPermission("invoices.create"), async (req: any, res) => {
     try {
       const userId = req.user.id;
 
@@ -1461,7 +1432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/brand-invoices/:id", isAuthenticated, requirePro("payment_tracking"), requireOrgPermission("payments.manage"), async (req: any, res) => {
+  app.patch("/api/brand-invoices/:id", isAuthenticated, requireOrgPermission("payments.manage"), async (req: any, res) => {
     try {
       const invoice = await storage.getBrandInvoice(parseInt(req.params.id));
       if (!invoice) {
@@ -1573,7 +1544,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/brand-invoices/:id", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.delete"), async (req: any, res) => {
+  app.delete("/api/brand-invoices/:id", isAuthenticated, requireOrgPermission("invoices.delete"), async (req: any, res) => {
     try {
       const invoice = await storage.getBrandInvoice(parseInt(req.params.id));
       if (!invoice) return res.status(404).json({ error: "Invoice not found" });
@@ -1614,7 +1585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       sendInternalError(res, "attachments", error, "upload_failed", "Failed to upload document");
     }
   };
-  app.post("/api/brand-invoices/:id/attachments", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.create"), attachmentUploadPrecheck, requireDurableUploads, uploadSingle("file"), async (req: any, res) => {
+  app.post("/api/brand-invoices/:id/attachments", isAuthenticated, requireOrgPermission("invoices.create"), attachmentUploadPrecheck, requireDurableUploads, uploadSingle("file"), async (req: any, res) => {
     try {
       const r = await recordAttachmentUpload(req.user, parseInt(req.params.id, 10), req.file, req.body?.category);
       if (!r.ok) return res.status(r.status).json({ code: r.code, error: r.error });
@@ -1640,7 +1611,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/attachments/:id", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.delete"), async (req: any, res) => {
+  app.delete("/api/attachments/:id", isAuthenticated, requireOrgPermission("invoices.delete"), async (req: any, res) => {
     try {
       const attachment = await storage.getInvoiceAttachment(parseInt(req.params.id));
       if (!attachment) return res.status(404).json({ error: "Document not found" });
@@ -1670,7 +1641,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Split deal amount into advance + final invoices
-  app.post("/api/deals/:id/split-invoices", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.create"), async (req: any, res) => {
+  app.post("/api/deals/:id/split-invoices", isAuthenticated, requireOrgPermission("invoices.create"), async (req: any, res) => {
     try {
       const dealId = parseInt(req.params.id);
       const deal = await storage.getDeal(dealId);
@@ -2620,9 +2591,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         purchased: credits.purchased,
         total: credits.total,
         resetsAt: user?.monthlyCreditsResetAt ?? null,
-        // True while paid Pro OR trial is in force — the balance above is
-        // irrelevant to deal creation while this is set.
-        unlimited: hasProAccess(user),
+        // Always true since deals became free: the balance above is kept for
+        // existing rows and older clients, and is not consulted any more.
+        unlimited: true,
         transactions: transactions.slice(0, 10),
       });
     } catch (error) {

@@ -10,7 +10,10 @@ describe("product facts agree with the code that charges and enforces them", () 
     expect(PRICING.proMonthlyInr).toBe(299); // from 12 Nov 2026 (₹199 from 18 Oct)
     expect("proYearlyInr" in PRICING).toBe(false); // one plan, monthly: no annual plan is sold
     expect("trialDays" in PRICING).toBe(false); // there is no trial (server/trial.ts)
-    expect(PRICING.freeMonthlyDeals).toBe((users.monthlyDealCredits as any).default);
+    // No free-plan deal cap since 13 Nov 2026: the deal-to-invoice flow is free and unmetered, so the facts
+    // must not quote a monthly deal allowance at all. users.monthlyDealCredits survives with its old default,
+    // but nothing spends it (POST /api/deals).
+    expect("freeMonthlyDeals" in PRICING).toBe(false);
     const saved = { m: process.env.PRO_MONTHLY_PRICE, y: process.env.PRO_YEARLY_PRICE, s: process.env.EXTRA_SEAT_PRICE };
     delete process.env.PRO_MONTHLY_PRICE; delete process.env.PRO_YEARLY_PRICE; delete process.env.EXTRA_SEAT_PRICE;
     try {
