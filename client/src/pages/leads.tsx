@@ -64,9 +64,16 @@ function NextStep({ lead, locale }: { lead: LeadRowView; locale: string }) {
 const subline = (l: LeadRowView) =>
   [l.contactName, l.contactRole].filter(Boolean).join(", ") || [l.industry, l.location].filter(Boolean).join(" · ") || l.website || "";
 
+/**
+ * `variants` is NEVER conditional here. A motion node that loses its variants stops being a variant node: it can no
+ * longer resolve "visible", so it keeps the inline opacity:0 it mounted with, forever. `animateRows` in the page
+ * DOES flip to false on the first re-render after data arrives, which lands while this stagger is still running --
+ * passing `undefined` there is what left the whole list blank (13 Nov 2026). `initial` alone decides whether a row
+ * fades in; with initial={false} it simply snaps to "visible".
+ */
 function LeadRow({ lead, locale, mine, index, animate }: { lead: LeadRowView; locale: string; mine: boolean; index: number; animate: boolean }) {
   return (
-    <motion.li variants={animate ? staggerItem(index) : undefined} initial={animate ? undefined : false}>
+    <motion.li variants={staggerItem(index)} initial={animate ? undefined : false}>
       <Link href={`/leads/${lead.id}`} asChild>
         <motion.a
           {...press}
@@ -141,7 +148,9 @@ export default function LeadsPage() {
   const notSetUp = !!error && String((error as Error).message).includes("LEADS_NOT_SETUP");
   const totalAll = counts ? Object.values(counts).reduce((a, b) => a + b, 0) : 0;
 
-  // Rows rise in once, on the first load only; a new filter, search or refetch shows them at once.
+  // Rows rise in once, on the first load only; a new filter, search or refetch shows them at once. This value
+  // DOES change mid-animation (the ref is set in the effect below, and any later render reads the new value), so
+  // nothing that would strand a half-animated row may depend on it — see the note in LeadRow.
   const introDone = useRef(false);
   const animateRows = !calm && !introDone.current;
   useEffect(() => { if (data) introDone.current = true; }, [data]);
