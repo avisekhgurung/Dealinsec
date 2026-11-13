@@ -590,7 +590,7 @@ function ctaBand(): string {
     <div class="cta-ico">${clock}</div>
     <div class="cta-copy">
       <h2>Find clients. Win deals. Get paid.</h2>
-      <p>For freelancers, consultants and small agencies, wherever you bill from: find clients with Client Radar, get help from your AI team in The Nest, then quotation, an agreement signed online, invoice and payment follow-up for each client, in your own currency. Free to start, with no card, in every country. Paid plans can currently be bought in India (₹${PRICING.proMonthlyInr}/month).</p>
+      <p>For freelancers, consultants and small agencies, wherever you bill from: find clients with Client Radar, get help from your AI Team, then quotation, an agreement signed online, invoice and payment follow-up for each client, in your own currency. Free to start, with no card, in every country. Paid plans can currently be bought in India (₹${PRICING.proMonthlyInr}/month).</p>
     </div>
     <a class="btn" href="${APP_LINK}" data-cta>Get started free →</a>
   </div></div>`;

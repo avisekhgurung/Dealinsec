@@ -872,7 +872,7 @@ describe("/ai-coworkers: Nibo, Mika and Zee, for India", () => {
 
   it("the homepage's crawler copy and FAQ structured data introduce the AI team (what search and AI engines read)", () => {
     const body = landingSeoBody();
-    expect(body).toContain("<h2>The Nest, your AI team: Nibo, Mika and Zee</h2>");
+    expect(body).toContain("<h2>AI Team: Nibo, Mika and Zee</h2>");
     expect(body).toMatch(/never send, pay or sign anything/);
     const page = injectLandingSeo('<html><head></head><body><div id="root"></div></body></html>');
     const faq = jsonLdBlocks(page).find((b) => b["@type"] === "FAQPage");

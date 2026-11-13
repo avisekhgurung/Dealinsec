@@ -221,7 +221,7 @@ export function GettingStarted() {
             >
               <span className="flex shrink-0 -space-x-2" aria-hidden>{(["nibo", "mika", "zee"] as const).map((b) => <Mascot key={b} bot={b} size={28} className="ring-2 ring-card" />)}</span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold leading-tight">Meet The Nest, your AI team</span>
+                <span className="block text-sm font-semibold leading-tight">Meet your AI Team</span>
                 <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">{LEAGUE_HINT[goal ?? "get_paid"]}</span>
               </span>
               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />

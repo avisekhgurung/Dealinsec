@@ -17,7 +17,7 @@ export const STT_AUDIO_TYPES = ["audio/webm", "audio/ogg", "audio/mp4", "audio/m
 export const STT_MAX_BYTES = 3_000_000;
 export const STT_MIN_BYTES = 800;
 /** Words a DealInSec call uses that a general model might mishear: they bias recognition, nothing more. */
-export const STT_KEYTERMS = ["DealInSec", "Nibo", "Mika", "Zee", "Client Radar", "The Nest", "quotation", "invoice", "GST", "agreement", "lead", "Razorpay"];
+export const STT_KEYTERMS = ["DealInSec", "Nibo", "Mika", "Zee", "Client Radar", "AI Team", "quotation", "invoice", "GST", "agreement", "lead", "Razorpay"];
 
 type Env = NodeJS.ProcessEnv;
 export const sttConfigured = (env: Env = process.env): boolean => !!env.SARVAM_API_KEY?.trim();

@@ -172,7 +172,7 @@ export function realRuntimeDeps(): RuntimeDeps {
       if (emailReports() && (OWN_CLOCK.has(run.task) || run.source === "schedule")) {
         const user = await storage.getUser(run.userId).catch(() => undefined);
         const { sendEmail, leagueReportEmail } = await import("../emails");
-        const mail = leagueReportEmail({ coworker: bot?.name ?? "The Nest", taskLabel: TASK_LABEL[run.task as LeagueTask] ?? run.task, headline: report.headline, counts: report.counts, runId: run.id, partial: status !== "completed" });
+        const mail = leagueReportEmail({ coworker: bot?.name ?? "AI Team", taskLabel: TASK_LABEL[run.task as LeagueTask] ?? run.task, headline: report.headline, counts: report.counts, runId: run.id, partial: status !== "completed" });
         let sent = false;
         for (let attempt = 0; attempt < 3 && !sent && user?.email; attempt++) {
           sent = await sendEmail({ to: user.email, ...mail });
@@ -181,7 +181,7 @@ export function realRuntimeDeps(): RuntimeDeps {
         await leagueStore.addEvent({ runId: run.id, orgId: run.organizationId, kind: sent ? "emailed" : "email_failed", message: sent ? "Report emailed to you" : "The report email couldn't be sent; the report is here in the app", now: new Date() }).catch(() => {});
       }
       await storage.logActivity({
-        organizationId: run.organizationId, userId: run.userId, userName: bot?.name ?? "The Nest",
+        organizationId: run.organizationId, userId: run.userId, userName: bot?.name ?? "AI Team",
         action: status === "completed" ? "completed a task" : status === "partial" ? "completed a task with limitations" : status === "cancelled" ? "cancelled a task" : "couldn't complete a task",
         entityType: "ai_league_run", entityId: run.id, detail: truncate(`${TASK_LABEL[run.task as LeagueTask] ?? run.task}: ${report.headline}`, 250),
       });

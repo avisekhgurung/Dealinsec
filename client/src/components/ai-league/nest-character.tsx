@@ -1,7 +1,7 @@
 /**
  * The Nest's plush coworkers, alive: Nibo 🔎 (brown bear-ear hat), Mika 💌 (pink heart hat) and Zee 🌱 (green sprout
  * hat). The artwork is the supplied character sheet, cropped into three poses each (client/src/lib/plush.ts); the
- * life comes from CSS (index.css, "The Nest"): a soft float and breath, each character's own small habit, a pose for
+ * life comes from CSS (index.css, "AI Team"): a soft float and breath, each character's own small habit, a pose for
  * real work, and a one-off hop when work is really done.
  *
  * The state always comes from the app, never invented here:

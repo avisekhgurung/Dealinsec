@@ -139,7 +139,7 @@ const DASHBOARD_LINKS = [
   { label: "Home", href: "/dashboard", icon: LayoutDashboard },
   { label: "Radar", href: "/outbound", icon: Briefcase },
   { label: "Leads", href: "/leads", icon: FileCheck },
-  { label: "The Nest", href: "/ai-league", icon: Receipt },
+  { label: "AI Team", href: "/ai-league", icon: Receipt },
   { label: "Profile", href: "/profile", icon: UserCircle },
 ];
 

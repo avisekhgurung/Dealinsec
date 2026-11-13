@@ -118,7 +118,7 @@ describe("Nibo hands a search's companies to Mika as a campaign", () => {
     expect(p).toMatchObject({ ok: true, forceApproval: true, args: { runId: "pr_abc123def456", campaignId: null, leadIds: [] } });
     expect(p.preview.title).toBe("Nibo asks Mika: Campaign drafts");
     expect(p.preview.lines).toEqual([{ label: "Handed over by", value: "Nibo" }, { label: "New campaign", value: "Named after the search" }, { label: "Leads", value: "The companies that search saved to Leads" }]);
-    expect(p.preview.effects).toContain("Mika's report appears in Mika's chat and in The Nest → Activity");
+    expect(p.preview.effects).toContain("Mika's report appears in Mika's chat and in AI Team → Activity");
     expect(p.preview.effects).toContain("Writes drafts only: nothing is approved or sent");
     const out: any = await tool.execute!(ctx("agentrun-4"), p.args);
     expect(starts).toEqual([{ user: "u1", task: "mika.campaign", input: p.args, idemKey: "handoffcampaign:nibo:agentrun-4" }]);

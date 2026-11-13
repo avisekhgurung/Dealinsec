@@ -38,7 +38,7 @@ type NavUser = Parameters<typeof canSeeModule>[0];
 
 export const NAV_GROUP_LABELS: Record<NavGroup, string> = {
   home: "Home",
-  league: "The Nest",
+  league: "AI Team",
   outbound: "Finding clients",
   pipeline: "Pipeline",
   documents: "Documents",
@@ -74,7 +74,7 @@ const def = (item: Omit<NavItem, "isActive">): NavItem => ({
 /** Every signed-in destination, in workflow order. */
 export const NAV_ITEMS: readonly NavItem[] = [
   def({ key: "home", label: "Home", shortLabel: "Home", href: "/dashboard", group: "home" }),
-  def({ key: "league", label: "The Nest 🪺", shortLabel: "The Nest", href: "/ai-league", group: "league", module: "deals" }),
+  def({ key: "league", label: "AI Team", shortLabel: "AI Team", href: "/ai-league", group: "league", module: "deals" }),
   def({ key: "outbound", label: "Client Radar 🔎", shortLabel: "Radar", href: "/outbound", group: "outbound", module: "deals" }),
   def({ key: "leads", label: "Leads", shortLabel: "Leads", href: "/leads", group: "outbound", module: "deals" }),
   def({ key: "deals", label: "Deals", shortLabel: "Deals", href: "/deals", group: "pipeline", module: "deals" }),

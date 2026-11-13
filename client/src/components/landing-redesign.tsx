@@ -14,7 +14,7 @@ import { Link } from "wouter";
 import {
   ArrowRight, Building2, Check, CheckCircle2, FileSignature, FileText, LayoutDashboard, LifeBuoy,
   Handshake, PlayCircle, ReceiptText, Search, ShieldCheck, Signature, Sparkles, UserRound, Users,
-  Flame, Lightbulb, Link2, Radar, X, Home, Bird, Target, MoreHorizontal, Lock,
+  Flame, Lightbulb, Link2, Radar, X, Home, UsersRound, Target, MoreHorizontal, Lock,
 } from "lucide-react";
 import { PRICING } from "@shared/product-facts";
 import { OUTBOUND_ALLOWANCE_DEFAULTS, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
@@ -93,7 +93,7 @@ const HERO_PROSPECT: ProspectCardData = {
   evidenceCount: 5, leadId: null, researched: true, contact: "public",
 };
 // The app's real desktop tabs: finding clients is the whole bar.
-const HERO_TABS = ["Home", "The Nest", "Radar", "Leads"] as const;
+const HERO_TABS = ["Home", "AI Team", "Radar", "Leads"] as const;
 const noop = () => {};
 
 /** The Nest on a phone, as the app shows it: each coworker with an example status (alive: the plush characters move). */
@@ -103,7 +103,7 @@ const PHONE_TEAM: { bot: "nibo" | "mika" | "zee"; state: NestAnimationState; sta
   { bot: "zee", state: "success", status: "Done · today's briefing is ready", tone: "text-emerald-700" },
 ];
 const PHONE_TABS = [
-  { Icon: Home, label: "Home" }, { Icon: Bird, label: "The Nest", on: true }, { Icon: Radar, label: "Radar" },
+  { Icon: Home, label: "Home" }, { Icon: UsersRound, label: "AI Team", on: true }, { Icon: Radar, label: "Radar" },
   { Icon: Target, label: "Leads" }, { Icon: MoreHorizontal, label: "More" },
 ];
 
@@ -115,7 +115,7 @@ function PhoneNest() {
         <div className="absolute left-0 top-0 h-[600px] w-[300px] origin-top-left scale-50 sm:scale-[0.62]">
           <div className="flex h-7 items-center justify-between px-6 pt-1 text-[11px] font-semibold text-neutral-800 dark:text-neutral-200"><span>9:41</span><span className="h-4 w-20 rounded-full bg-neutral-900" /><span>●●●</span></div>
           <div className="px-4 pt-3">
-            <p className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white">The Nest <span aria-hidden>🪺</span></p>
+            <p className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white">AI Team</p>
             <p className="text-[11px] font-medium text-neutral-500">My AI Team · Finding your next client</p>
           </div>
           <ul className="space-y-2.5 px-3 pt-4">
@@ -236,7 +236,7 @@ export function HeroSection({ isAuthenticated, onPrimary }: { isAuthenticated: b
         </div>
         <div className="relative min-w-0 lg:pl-4">
           <HeroProduct />
-          <p className="mt-20 text-left text-[11px] text-neutral-400 sm:pr-48">Real DealInSec screens (Client Radar and The Nest), with example data.</p>
+          <p className="mt-20 text-left text-[11px] text-neutral-400 sm:pr-48">Real DealInSec screens (Client Radar and AI Team), with example data.</p>
         </div>
       </div>
     </section>
@@ -462,9 +462,9 @@ export function AiTeamSection() {
     <section id="ai-team" className="scroll-mt-20 py-16 sm:py-20" data-testid="landing-ai-team">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <Reveal className="mx-auto max-w-3xl text-center">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"><span aria-hidden>🪺</span>The Nest · My AI Team</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">AI Team</span>
           <h2 className="mt-3 text-balance text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Meet Nibo, Mika and Zee, <span className={GREEN}>your AI team</span></h2>
-          <p className="mt-3 text-neutral-600 dark:text-neutral-400">They live in The Nest, your AI team inside DealInSec, and help with the legwork in the background: Nibo finds potential clients, Mika drafts outreach and follow-ups, and Zee keeps you on top of what needs your attention. They keep working when you close the page, and they ask before anything that matters. AI results may be incomplete or inaccurate, so check important details before contacting a client.</p>
+          <p className="mt-3 text-neutral-600 dark:text-neutral-400">They live in AI Team inside DealInSec, and help with the legwork in the background: Nibo finds potential clients, Mika drafts outreach and follow-ups, and Zee keeps you on top of what needs your attention. They keep working when you close the page, and they ask before anything that matters. AI results may be incomplete or inaccurate, so check important details before contacting a client.</p>
         </Reveal>
         <Reveal className="mx-auto mt-8 max-w-3xl">
           <img {...NEST_TEAM_IMAGE} sizes="(min-width: 800px) 768px, 100vw" loading="lazy" decoding="async" draggable={false}

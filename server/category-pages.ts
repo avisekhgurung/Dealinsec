@@ -184,8 +184,8 @@ function header(): string {
 function footer(region: "IN" | "global"): string {
   const tagline =
     region === "IN"
-      ? "find clients, win deals and get paid. For freelancers, consultants and small agencies in India: Client Radar to find clients, The Nest AI team, then quotation, agreement signed online, invoice and payment follow-up."
-      : "find clients, win deals and get paid. For freelancers, consultants and small agencies wherever they bill from: Client Radar to find clients, The Nest AI team, then quotation, agreement signed online, invoice and payment follow-up.";
+      ? "find clients, win deals and get paid. For freelancers, consultants and small agencies in India: Client Radar to find clients, AI Team, then quotation, agreement signed online, invoice and payment follow-up."
+      : "find clients, win deals and get paid. For freelancers, consultants and small agencies wherever they bill from: Client Radar to find clients, AI Team, then quotation, agreement signed online, invoice and payment follow-up.";
   return `<footer class="site"><div class="wrap">
     <div class="links">
       <a href="/">Product</a>
@@ -194,7 +194,7 @@ function footer(region: "IN" | "global"): string {
       <a href="/for-freelancers">For Freelancers</a>
       <a href="/for-creators">For Creators</a>
       <a href="/find-local-clients">Find Local Clients</a>
-      <a href="/ai-coworkers">AI Team (The Nest)</a>
+      <a href="/ai-coworkers">AI Team</a>
       <a href="/tools/deal-risk-checker">Deal Risk Checker</a>
       <a href="/freelancer-invoice-software">Freelancer Invoice Software</a>
       <a href="/quotation-software">Quotation Software</a>
@@ -217,8 +217,8 @@ function footer(region: "IN" | "global"): string {
 function ctaBand(region: "IN" | "global"): string {
   const sub =
     region === "IN"
-      ? "Client Radar finds potential clients with evidence, your AI team in The Nest helps with research, drafts and briefings, and every deal runs from quotation to an agreement signed online, invoices and payment follow-up. For freelancers, consultants and small agencies in India."
-      : "Client Radar finds potential clients with evidence, your AI team in The Nest helps with research, drafts and briefings, and every deal runs from quotation to an agreement signed online, invoices and payment follow-up. For freelancers, consultants and small agencies, wherever you bill from.";
+      ? "Client Radar finds potential clients with evidence, your AI Team helps with research, drafts and briefings, and every deal runs from quotation to an agreement signed online, invoices and payment follow-up. For freelancers, consultants and small agencies in India."
+      : "Client Radar finds potential clients with evidence, your AI Team helps with research, drafts and briefings, and every deal runs from quotation to an agreement signed online, invoices and payment follow-up. For freelancers, consultants and small agencies, wherever you bill from.";
   const note =
     region === "IN"
       ? `No card required · Free plan · Pro ₹${PRICING.proMonthlyInr}/month`
@@ -261,7 +261,7 @@ function aiTeamSection(): string {
   ];
   const cards = mates.map((m) => `<div class="mate"><img src="/ai-league/plush/${m.bot}-${m.bot === "nibo" ? "search" : m.bot === "mika" ? "letter" : "tea"}-sm.webp" width="64" height="64" loading="lazy" decoding="async" alt="${m.name.split(" ")[0]}, the ${m.role}"><div><b>${m.name}</b><div class="role" style="color:${m.colour}">${m.role}</div><p>${m.line}</p></div></div>`).join("");
   return `<section><div class="wrap">
-    <h2>Your AI team in The Nest 🪺</h2>
+    <h2>Your AI Team</h2>
     <p class="sec-sub">Three AI coworkers work in the background through the same features you use, and ask before anything that matters. Nothing is sent, paid or signed by them. <a href="/ai-coworkers">Meet the team</a>.</p>
     <div class="team">${cards}</div>
   </div></section>`;
@@ -906,7 +906,7 @@ export const PAGES: CategoryPage[] = [
     description:
       "Three AI coworkers inside DealInSec: Nibo researches companies that fit, Mika drafts first messages you approve, Zee briefs you from your own records.",
     h1: "AI coworkers for your business workflow",
-    sub: "Meet The Nest 🪺, your AI team. Nibo 🔎, the Deal Finder, researches companies that fit what you sell; Mika 💌, the Deal Closer, drafts outreach and follow-ups for you to approve; and Zee 🌱, your Business Buddy, tells you what needs you today, from your own follow-ups and the messages waiting for your approval. They work in the background and ask before anything that spends your allowance or changes something.",
+    sub: "Meet AI Team, your AI coworkers. Nibo 🔎, the Deal Finder, researches companies that fit what you sell; Mika 💌, the Deal Closer, drafts outreach and follow-ups for you to approve; and Zee 🌱, your Business Buddy, tells you what needs you today, from your own follow-ups and the messages waiting for your approval. They work in the background and ask before anything that spends your allowance or changes something.",
     chips: ["Research with sources", "Drafts only, you send", "Briefings from your records", "Run in the background", "Free plan, no card"],
     shortLabel: "AI Coworkers",
     sections: `
@@ -922,7 +922,7 @@ export const PAGES: CategoryPage[] = [
 <section><div class="wrap">
   <h2>How they work</h2>
   <div class="feat">
-    <div class="ft"><b>Chat, or start a task</b><p>Ask a coworker in its own chat, or start a task from The Nest, your AI team's page in the app. A task runs on the server, so it keeps going if you close the page, and reports back with what it did and links to the records.</p></div>
+    <div class="ft"><b>Chat, or start a task</b><p>Ask a coworker in its own chat, or start a task from AI Team's page in the app. A task runs on the server, so it keeps going if you close the page, and reports back with what it did and links to the records.</p></div>
     <div class="ft"><b>Approvals stay yours</b><p>Anything that spends your allowance or changes your records waits for your approval, and nothing is sent, paid or signed by a coworker. Handing work from one coworker to another asks you first too.</p></div>
     <div class="ft"><b>They help each other</b><p>A coworker can ask a teammate for a view from the teammate's own records, or call a short team huddle where all three talk a question over and suggest next steps. Talking changes nothing.</p></div>
     <div class="ft"><b>Schedules</b><p>Set a task to run every day, every weekday or every week at a time in your timezone, such as a weekday morning briefing from Zee.</p></div>
@@ -1366,7 +1366,7 @@ export const PAGES: CategoryPage[] = [
 </div></section>
 <section><div class="wrap">
   <h2>The founder approves; the team and the AI do the legwork</h2>
-  <p class="sec-sub">In <a href="/ai-coworkers">The Nest</a>, Nibo researches companies against your profile and saves qualified ones to Leads with their evidence; Mika drafts first messages and follow-ups from verified facts only; Zee briefs the team each morning on which follow-ups are due and which drafts await approval. A person — usually the founder — edits and approves every message and sends it from the agency's own email, WhatsApp or LinkedIn. Outreach keeps the founder's voice without consuming the founder's week, and nothing is ever sent automatically.</p>
+  <p class="sec-sub">In <a href="/ai-coworkers">AI Team</a>, Nibo researches companies against your profile and saves qualified ones to Leads with their evidence; Mika drafts first messages and follow-ups from verified facts only; Zee briefs the team each morning on which follow-ups are due and which drafts await approval. A person — usually the founder — edits and approves every message and sends it from the agency's own email, WhatsApp or LinkedIn. Outreach keeps the founder's voice without consuming the founder's week, and nothing is ever sent automatically.</p>
 </div></section>
 <section><div class="wrap">
   <h2>One pipeline the whole team works</h2>

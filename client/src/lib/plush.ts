@@ -31,7 +31,7 @@ export const NEST_TEAM_IMAGE = {
   srcSet: `${DIR}/the-nest-team-sm.webp 720w, ${DIR}/the-nest-team.webp 1200w`,
   width: 1200,
   height: 800,
-  alt: "The Nest, your AI team: Nibo the Deal Finder in a brown bear-ear hat with a magnifying glass, Mika the Deal Closer in a pink heart hat holding a letter, and Zee the Business Buddy in a green sprout hat holding a checklist, sitting together in a knitted nest.",
+  alt: "AI Team: Nibo the Deal Finder in a brown bear-ear hat with a magnifying glass, Mika the Deal Closer in a pink heart hat holding a letter, and Zee the Business Buddy in a green sprout hat holding a checklist, sitting together in a knitted nest.",
 } as const;
 
 /** Every file the poses and the team picture point at (for the asset test). */

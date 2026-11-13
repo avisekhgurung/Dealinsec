@@ -96,7 +96,7 @@ function LeagueHome() {
       <header className="glass-header sticky top-0 z-40 lg:border-b lg:border-neutral-200/60 dark:lg:border-neutral-800/60">
         <div className="flex items-center justify-between gap-4 px-4 py-4 lg:mx-auto lg:max-w-[1400px] lg:px-8">
           <div className="min-w-0">
-            <h1 className="text-xl font-bold tracking-tight lg:text-2xl">The Nest <span aria-hidden>🪺</span></h1>
+            <h1 className="text-xl font-bold tracking-tight lg:text-2xl">AI Team</h1>
             <p className="mt-0.5 text-sm font-medium text-foreground/80">My AI Team · Find clients. Win deals. Get paid.</p>
 
           </div>
@@ -106,11 +106,11 @@ function LeagueHome() {
 
       <main className="space-y-5 px-4 py-5 lg:mx-auto lg:max-w-[1400px] lg:px-8 lg:py-6">
         {status.data && !status.data.ready ? (
-          <div className="rounded-2xl border px-6 py-12 text-center" data-testid="league-not-setup"><p className="font-semibold">The Nest isn't switched on yet</p><p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">It hasn't been set up on this server yet. Everything else in DealInSec works as usual.</p></div>
+          <div className="rounded-2xl border px-6 py-12 text-center" data-testid="league-not-setup"><p className="font-semibold">AI Team isn't switched on yet</p><p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">It hasn't been set up on this server yet. Everything else in DealInSec works as usual.</p></div>
         ) : (
           <>
             <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-            <SegmentedTabs label="The Nest views" value={view} onChange={setView} className="w-max min-w-full max-w-none sm:min-w-0 [&>button]:flex-auto [&>button]:shrink-0"
+            <SegmentedTabs label="AI Team views" value={view} onChange={setView} className="w-max min-w-full max-w-none sm:min-w-0 [&>button]:flex-auto [&>button]:shrink-0"
               tabs={[
                 { value: "team", label: <span className="whitespace-nowrap">Team</span>, testId: "league-view-team" },
                 { value: "activity", label: <span className="whitespace-nowrap">Activity</span>, testId: "league-view-activity" },
@@ -201,7 +201,7 @@ function NestWelcome() {
       <div className="grid items-center gap-0">
         <div className="space-y-3 p-4 sm:p-5">
           <div className="pr-14">
-            <h2 id="nest-welcome-h" className="text-lg font-bold tracking-tight">Welcome to The Nest <span aria-hidden>🪺</span></h2>
+            <h2 id="nest-welcome-h" className="text-lg font-bold tracking-tight">Welcome to AI Team</h2>
             <p className="text-sm text-muted-foreground">Your AI team works in the background and asks before anything that matters.{agentOn === true && <> Need a quick answer instead? <Link href="/agent" className="font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400" data-testid="league-ask-agent">Ask DealInSec</Link>.</>}</p>
           </div>
           <ul className="space-y-2 text-sm">
@@ -365,7 +365,7 @@ function CoworkerChat({ bot }: { bot: Bot }) {
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_22rem]">
         {/* Roster: a compact column on desktop */}
         <nav className="hidden border-r p-3 lg:block" aria-label="Coworkers">
-          <Link href="/ai-league" className="mb-3 flex items-center gap-1.5 px-2 text-xs font-medium text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" />The Nest</Link>
+          <Link href="/ai-league" className="mb-3 flex items-center gap-1.5 px-2 text-xs font-medium text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" />AI Team</Link>
           <ul className="space-y-1">
             {BOTS.map((b) => {
               const c = roster.data?.bots.find((x) => x.bot === b);
@@ -385,7 +385,7 @@ function CoworkerChat({ bot }: { bot: Bot }) {
         {/* The conversation */}
         <section className="flex min-h-0 min-w-0 flex-col" aria-label={`Chat with ${id.name}`}>
           <header className="flex items-center gap-3 border-b px-4 py-3">
-            <Link href="/ai-league" className="lg:hidden" aria-label="Back to The Nest"><ArrowLeft className="h-5 w-5" /></Link>
+            <Link href="/ai-league" className="lg:hidden" aria-label="Back to AI Team"><ArrowLeft className="h-5 w-5" /></Link>
             <Mascot bot={bot} size={44} state={agent.running ? "thinking" : mascotState(card?.status)} speaking={(agent.running && !!agent.live) || reading} eager />
             <div className="min-w-0 flex-1">
               <h1 className="text-base font-semibold leading-tight">{id.name} <span aria-hidden>{id.emoji}</span></h1>

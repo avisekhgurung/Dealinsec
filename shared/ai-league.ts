@@ -1,5 +1,5 @@
 /**
- * DealInSec's AI team, shown to people as "The Nest" (code, routes and tables keep the "league" name): three coworkers,
+ * DealInSec's AI team, shown to people as "AI Team" (code, routes and tables keep the "league" name): three coworkers,
  * one runtime (server/ai-league). Pure: the server, the browser and the tests
  * read the same identities, task templates, statuses and schedule arithmetic.
  *

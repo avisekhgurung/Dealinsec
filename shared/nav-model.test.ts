@@ -67,7 +67,7 @@ describe("active route", () => {
 describe("desktop sections", () => {
   it("shows every area in workflow order, with Leads on the finding side and never beside Deals", () => {
     const s = desktopNavSections(OWNER);
-    expect(s.map((x) => x.label)).toEqual(["Home", "The Nest", "Finding clients", "Pipeline", "Documents", "Money"]);
+    expect(s.map((x) => x.label)).toEqual(["Home", "AI Team", "Finding clients", "Pipeline", "Documents", "Money"]);
     // The split that matters: Leads belongs to finding clients, Deals to the Deal Suite. Never the same group.
     expect(keys(s.find((x) => x.group === "outbound")!.items)).toEqual(["outbound", "leads"]);
     expect(keys(s.find((x) => x.group === "pipeline")!.items)).toEqual(["deals"]);
@@ -92,9 +92,9 @@ describe("desktop sections", () => {
 });
 
 describe("mobile bar and More sheet", () => {
-  it("bar is Home, The Nest, Radar, Leads (More is added by the component)", () => {
+  it("bar is Home, AI Team, Radar, Leads (More is added by the component)", () => {
     expect(keys(mobileBarItems(OWNER))).toEqual(["home", "outbound", "league", "leads"]);
-    expect(mobileBarItems(OWNER).map((i) => i.shortLabel)).toEqual(["Home", "Radar", "The Nest", "Leads"]);
+    expect(mobileBarItems(OWNER).map((i) => i.shortLabel)).toEqual(["Home", "Radar", "AI Team", "Leads"]);
   });
 
   it("sheet holds the deal suite and Account, never repeating a bar item", () => {
@@ -134,7 +134,7 @@ describe("mobile bar and More sheet", () => {
 });
 
 describe("desktop bar: finding is the bar, the deal suite sits behind the Workspace menu", () => {
-  it("shows Home, The Nest, Client Radar and Leads as tabs, with the suite in the menu behind them", () => {
+  it("shows Home, AI Team, Client Radar and Leads as tabs, with the suite in the menu behind them", () => {
     expect(desktopBarItems(OWNER).map((i) => i.key)).toEqual(["home", "league", "outbound", "leads"]);
     expect(desktopMoreSections(OWNER).map((s) => [s.label, keys(s.items)]))
       .toEqual([["Pipeline", ["deals"]], ["Documents", ["quotations", "agreements"]], ["Money", ["invoices"]]]);

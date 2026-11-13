@@ -34,7 +34,7 @@ const defaults = (): LeagueDeps => ({
   kick: () => { void import("./runtime").then((m) => m.kickLeague()); },
   tier: outboundTier,
 });
-const NOT_SETUP = () => fail(503, "LEAGUE_NOT_SETUP", "The Nest isn't set up on this server yet.");
+const NOT_SETUP = () => fail(503, "LEAGUE_NOT_SETUP", "AI Team isn't set up on this server yet.");
 const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString() : null);
 
 /* ── views ───────────────────────────────────────────────────────────────── */

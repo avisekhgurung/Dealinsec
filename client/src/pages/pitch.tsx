@@ -81,7 +81,7 @@ export default function PitchPage() {
             <h1 className="mt-4 text-4xl font-extrabold tracking-tight md:text-5xl print:text-3xl">{TAGLINE}</h1>
             <p className="mt-4 text-lg text-muted-foreground print:text-base">
               DealInSec is a simple business workspace for freelancers, consultants and small agencies. Find potential clients with Client Radar,
-              get help from your AI team in The Nest, and run every deal from quotation to agreement, invoice and payment follow-up in one place.
+              get help from your AI Team, and run every deal from quotation to agreement, invoice and payment follow-up in one place.
             </p>
             <ul className="mt-5 grid gap-2 text-sm sm:grid-cols-2">
               {["Free plan, no credit card required", `Pro ₹${PRICING.proMonthlyInr}/month in India`, "You approve everything that reaches a client", "Works on phone and desktop"].map((t) => (
@@ -127,7 +127,7 @@ export default function PitchPage() {
         {/* The Nest */}
         <section aria-labelledby="nest-h" className="print:break-inside-avoid">
           <p className="text-center text-sm font-semibold text-primary">Your AI team</p>
-          <h2 id="nest-h" className="mt-1 text-center text-2xl font-bold print:text-xl">The Nest 🪺: meet Nibo, Mika and Zee</h2>
+          <h2 id="nest-h" className="mt-1 text-center text-2xl font-bold print:text-xl">AI Team: meet Nibo, Mika and Zee</h2>
           <p className="mx-auto mt-2 max-w-2xl text-center text-muted-foreground">Three AI coworkers who work in the background through DealInSec's own features. They keep going when you close the page, can ask each other for help, and always ask before anything that matters.</p>
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {TEAM.map((m) => (
