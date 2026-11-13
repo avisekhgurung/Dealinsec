@@ -22,8 +22,8 @@ import { StatusBadge } from "@/components/status-badge";
 import { useMemo, useState, useEffect, useRef } from "react";
 import {
   Plus, Briefcase, FileCheck, Receipt, ChevronRight, LogOut,
-  TrendingUp, IndianRupee, Banknote, CheckCircle2,
-  UserCircle, MapPin, FileText, PenTool, Landmark, X as XIcon, Sparkles,
+  TrendingUp, IndianRupee, Banknote,
+  FileText, Sparkles,
   Crown, Rocket, Users2, UserPlus2, Settings as SettingsIcon,
   Zap, FileSignature, ArrowUpRight, Radar, UsersRound
 } from "lucide-react";
@@ -736,51 +736,14 @@ export default function DashboardPage() {
 
   const recentDeals = deals.slice(0, 3);
 
-  // ── Profile-completion nudge ─────────────────────────────────────────────
-  // Compute which profile fields are still missing so we can prompt the user
-  // to finish their setup before they get blocked at contract/invoice time.
-  const profileChecklist = useMemo(() => [
-    // Deep links land straight in EDIT mode on the right section — never on
-    // the read-only page with an Edit button to hunt for.
-    { key: "billingAddress",     label: "Billing address",  cta: "Add billing address", icon: MapPin,      done: Boolean(user?.billingAddress),     href: "/profile?edit=1&section=business",  hint: "Printed on every invoice" },
-    // PAN is an Indian tax ID. Outside India profile.tsx hides the field, so
-    // the task could never be completed and would nag forever.
-    ...(fmt.settings.country === "IN"
-      ? [{ key: "panNumber",     label: "PAN number",       cta: "Add PAN number", icon: FileText,    done: Boolean(user?.panNumber),          href: "/profile?edit=1&section=business",  hint: "Printed on your agreements" }]
-      : []),
-    { key: "digitalSignature",   label: "Signature",        cta: "Add your signature", icon: PenTool,     done: Boolean(user?.digitalSignature),   href: "/profile?edit=1&section=signature", hint: "Added to your agreements for you" },
-    { key: "bank",               label: "Bank details",     cta: "Add bank details", icon: Landmark,    done: Boolean(user?.accountNumber && user?.ifscCode && user?.accountHolderName), href: "/profile?edit=1&section=bank", hint: "Printed on invoices so clients know where to pay" },
-  ], [fmt.settings.country, user?.billingAddress, user?.panNumber, user?.digitalSignature, user?.accountNumber, user?.ifscCode, user?.accountHolderName]);
-
-  const profileDone = profileChecklist.filter(i => i.done).length;
-  const profileTotal = profileChecklist.length;
-  const profilePct = Math.round((profileDone / profileTotal) * 100);
-  const profileIncomplete = profileChecklist.filter(i => !i.done);
-
-  // Dismiss state — reappears after 24 hours or if user completes a step
-  const DISMISS_KEY = "profileNudgeDismissedAt";
-  const [nudgeDismissed, setNudgeDismissed] = useState(false);
-  useEffect(() => {
-    const ts = localStorage.getItem(DISMISS_KEY);
-    if (ts && Date.now() - parseInt(ts, 10) < 24 * 60 * 60 * 1000) {
-      setNudgeDismissed(true);
-    }
-  }, []);
-  const dismissNudge = () => {
-    localStorage.setItem(DISMISS_KEY, String(Date.now()));
-    setNudgeDismissed(true);
-  };
-
-  // The billing-address/PAN/signature/bank nudge serves the deal documents; while the suite is hidden it would be
-  // the first thing a new account sees about a flow it can't reach, so it hides with the suite (shared/flags.ts).
-  const showProfileNudge = !DEAL_SUITE_HIDDEN && profileDone < profileTotal && !nudgeDismissed;
-
+  // The profile checklist (billing address, PAN, signature, bank) is the paperwork's: it lives on the Profile page,
+  // never on Home (13 Nov 2026, founder: Home must not read as if the Deal Suite were the point).
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     window.location.href = "/";
   };
 
-  // ── The dashboard's pieces, arranged by who is looking ─────────────────────────────────────
+  // ── The dashboard's pieces, arranged by who is looking ───────────────────────────────
   // An account with deals reads analytics first: the numbers, then what needs attention, then the
   // charts, with account and setup last. An account with no deals yet is still setting up, so its
   // order stays as it was: setup first.
@@ -799,135 +762,6 @@ export default function DashboardPage() {
     dealsKnown: !dealsLoading && !dealsError,
     dealCount: deals.length,
   });
-  const nudgeEl = (
-    <>
-{/* ── Profile completion nudge — top priority before any action ── */}
-        {showProfileNudge && (
-          <Card className="border-amber-200/70 dark:border-amber-900/40 bg-gradient-to-br from-amber-50 via-orange-50/40 to-white dark:from-amber-950/30 dark:via-orange-950/20 dark:to-transparent relative overflow-hidden">
-            <CardContent className="p-4 lg:p-6">
-              <div className="flex items-start justify-between gap-3 mb-3 lg:mb-4">
-                <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <div className="flex-shrink-0 w-9 h-9 lg:w-11 lg:h-11 rounded-xl bg-amber-500/15 flex items-center justify-center">
-                    <UserCircle className="w-4 h-4 lg:w-5 lg:h-5 text-amber-700 dark:text-amber-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <h3 className="text-sm lg:text-base font-bold text-foreground">
-                        Finish your profile{" "}
-                        <span className="text-amber-700 dark:text-amber-400 tabular-nums">
-                          ({profileDone}/{profileTotal})
-                        </span>
-                      </h3>
-                      <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-800 dark:text-amber-300">
-                        <Sparkles className="w-2.5 h-2.5" />
-                        Quick win
-                      </span>
-                    </div>
-                    <p className="text-xs lg:text-sm text-muted-foreground leading-snug">
-                      Add these details once and every agreement and invoice you create will include them.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={dismissNudge}
-                  className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground/70 hover:text-foreground hover:bg-foreground/5 transition-colors"
-                  aria-label="Dismiss for now"
-                  data-testid="dismiss-profile-nudge"
-                >
-                  <XIcon className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Progress bar */}
-              <div className="w-full h-1.5 lg:h-2 rounded-full bg-amber-200/50 dark:bg-amber-900/40 overflow-hidden mb-3 lg:mb-4">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-700"
-                  style={{ width: `${profilePct}%` }}
-                />
-              </div>
-
-              {/* Checklist — 2x2 on mobile, 4-col on lg */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-3">
-                {profileChecklist.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Link key={item.key} href={item.href}>
-                      <button
-                        type="button"
-                        className={`w-full text-left rounded-xl border p-2.5 lg:p-3 transition-all ${
-                          item.done
-                            ? "border-emerald-300/60 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20"
-                            : "border-amber-300/60 bg-white/70 dark:border-amber-900/40 dark:bg-amber-950/10 hover:border-amber-400 hover:shadow-sm cursor-pointer"
-                        }`}
-                        data-testid={`profile-item-${item.key}`}
-                      >
-                        <div className="flex items-center gap-2 mb-1 lg:mb-1.5">
-                          <div className={`w-6 h-6 lg:w-7 lg:h-7 rounded-md flex items-center justify-center ${
-                            item.done
-                              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                              : "bg-amber-500/15 text-amber-700 dark:text-amber-400"
-                          }`}>
-                            {item.done ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Icon className="w-3.5 h-3.5" />}
-                          </div>
-                          <span className="text-[11px] lg:text-xs font-semibold text-foreground truncate">
-                            {item.label}
-                          </span>
-                        </div>
-                        <p className={`text-[10px] lg:text-[11px] leading-snug pl-8 lg:pl-9 line-clamp-2 ${
-                          item.done ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"
-                        }`}>
-                          {item.done ? "✓ All set" : item.hint}
-                        </p>
-                      </button>
-                    </Link>
-                  );
-                })}
-              </div>
-
-              {/* Primary CTA — go directly to first incomplete item */}
-              {profileIncomplete.length > 0 && (
-                <Link href={profileIncomplete[0].href}>
-                  <Button
-                    size="sm"
-                    className="mt-3 lg:mt-4 w-full sm:w-auto gradient-btn text-white"
-                    data-testid="complete-profile-cta"
-                  >
-                    {profileIncomplete[0].cta}
-                    <ChevronRight className="w-4 h-4 ml-1" />
-                  </Button>
-                </Link>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        
-    </>
-  );
-  const profileStripEl = showProfileNudge && profileIncomplete.length > 0 ? (
-    <Card className="border-amber-200/70 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20" data-testid="profile-strip">
-      <CardContent className="flex flex-wrap items-center gap-x-3 gap-y-2.5 p-3 lg:gap-x-4 lg:px-5">
-        <UserCircle className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
-        <p className="min-w-[11rem] flex-1 text-sm font-semibold text-foreground">
-          Finish your profile <span className="tabular-nums text-amber-700 dark:text-amber-400">({profileDone}/{profileTotal})</span>
-          <span className="ml-2 hidden font-normal text-muted-foreground sm:inline">so your agreements and invoices include your business details</span>
-        </p>
-        <div className="hidden h-1.5 w-28 overflow-hidden rounded-full bg-amber-200/60 dark:bg-amber-900/40 sm:block" aria-hidden="true">
-          <div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500" style={{ width: `${profilePct}%` }} />
-        </div>
-        <Link href={profileIncomplete[0].href} className="order-last w-full sm:order-none sm:w-auto">
-          <Button size="sm" className="gradient-btn w-full text-white sm:w-auto" data-testid="complete-profile-cta">
-            {profileIncomplete[0].cta}
-            <ChevronRight className="ml-1 h-4 w-4" />
-          </Button>
-        </Link>
-        <button type="button" onClick={dismissNudge} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground" aria-label="Dismiss for now" data-testid="dismiss-profile-nudge">
-          <XIcon className="h-4 w-4" />
-        </button>
-      </CardContent>
-    </Card>
-  ) : null;
   const accountEl = (
     <>
       <SubscriptionCard user={user} />
@@ -1501,7 +1335,6 @@ export default function DashboardPage() {
               <LoadError what="your deals" compact onRetry={() => void refetchDeals()} retrying={dealsFetching} />
             </Card>
             <div className="empty:hidden lg:col-span-6"><GettingStarted /></div>
-            <div className="empty:hidden lg:col-span-6">{profileStripEl}</div>
             {/* Today reads its own sources (invoices, agreements, follow-ups…), so it still answers without deals. */}
             <div className="empty:hidden lg:col-span-4 lg:row-span-2">{todayEl}</div>
             <div className="hidden lg:col-span-2 lg:block">{quickActionsEl}</div>
@@ -1510,7 +1343,6 @@ export default function DashboardPage() {
         ) : firstRun ? (
           <>
             <div className="empty:hidden lg:col-span-6"><GettingStarted /></div>
-            <div className="empty:hidden lg:col-span-6">{nudgeEl}</div>
             {/* A brand-new account sees Today only when something real needs it — never an unearned "All clear". */}
             <div className="empty:hidden lg:col-span-4 lg:row-span-2"><TodayPanel hideWhenEmpty /></div>
             <div className="hidden lg:col-span-2 lg:block">{quickActionsEl}</div>
@@ -1523,7 +1355,6 @@ export default function DashboardPage() {
         ) : (
           <>
             <div className="empty:hidden lg:col-span-6"><GettingStarted /></div>
-            <div className="empty:hidden lg:col-span-6">{profileStripEl}</div>
             <div className="empty:hidden lg:col-span-4 lg:row-span-2">{todayEl}</div>
             <div className="hidden lg:col-span-2 lg:block">{quickActionsEl}</div>
             <div className="hidden empty:hidden lg:col-span-2 lg:block"><AllowanceTile /></div>
