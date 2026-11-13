@@ -17,7 +17,7 @@
  * of DEFAULT_ROLE_SEEDS and can be recreated from the Roles screen.
  */
 import pg from "pg";
-import { DEFAULT_ROLE_SEEDS, FINDING_PERMISSIONS } from "../shared/permissions";
+import { ASSIGNABLE_PERMISSIONS, DEFAULT_ROLE_SEEDS, FINDING_PERMISSIONS } from "../shared/permissions";
 
 const { Pool } = pg;
 if (!process.env.DATABASE_URL) {
@@ -43,8 +43,11 @@ async function main() {
       // permissions tolerated, in case this script already ran once).
       const seed = DEFAULT_ROLE_SEEDS.find((s) => s.name === r.name);
       const seedBase = seed ? seed.permissions.filter((p) => !(FINDING_PERMISSIONS as string[]).includes(p)) : [];
+      // Rows seeded by older builds also carry strings the code no longer assigns ("clients.manage"); those never
+      // granted anything, so they do not make a row "edited".
+      const legacy = (p: string) => !(ASSIGNABLE_PERMISSIONS as string[]).includes(p);
       const isUntouchedSeed = !!seed && r.members === 0 &&
-        perms.every((p) => (seedBase as string[]).includes(p) || (FINDING_PERMISSIONS as string[]).includes(p)) &&
+        perms.every((p) => (seedBase as string[]).includes(p) || (FINDING_PERMISSIONS as string[]).includes(p) || legacy(p)) &&
         seedBase.every((p) => perms.includes(p));
       if (isUntouchedSeed) {
         removed++;
