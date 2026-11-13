@@ -1620,8 +1620,9 @@ export function renderCategoryPage(p: CategoryPage, siblings: RelatedLink[]): st
       ? [
           { "@type": "Offer", name: "DealInSec Pro", price: String(PRICING.proMonthlyInr), priceCurrency: "INR", description: `Pro plan ₹${PRICING.proMonthlyInr}/month; free plan available` },
         ]
-      : // Never advertise a price that cannot be bought from where the reader is.
-        [{ "@type": "Offer", name: "Free plan", price: "0", priceCurrency: "USD", description: "4 deals a month with quotations, in every country" }];
+      : // Never advertise a price that cannot be bought from where the reader is. The description leads with client
+        // research, because this is the entity description answer engines read off /about and the global pages.
+        [{ "@type": "Offer", name: "Free plan", price: "0", priceCurrency: "USD", description: `${OB.free.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days, ${OB.free.monthlyDrafts} AI outreach drafts you approve and send yourself, the leads pipeline, and ${PRICING.freeMonthlyDeals} deals a month with quotations. Available in every country.` }];
   const jsonLd: object[] = [
     {
       "@context": "https://schema.org",

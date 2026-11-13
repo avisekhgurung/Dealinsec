@@ -21,6 +21,7 @@ import { EXAMPLES as DEAL_RISK_EXAMPLES, FAQ as DEAL_RISK_FAQ } from "./tools/de
 import { injectLandingSeo, landingSeoBody } from "./landing-seo";
 import { AUDIENCE_DESCRIPTIONS, COMPARISON_DESCRIPTIONS, TOOL_DESCRIPTIONS, llmsTxt } from "./llms";
 import { categorySitemapPaths } from "./category-pages";
+import { ORGANIZATION_SAME_AS } from "./site-head";
 
 type Handler = (req: unknown, res: any) => void;
 
@@ -365,8 +366,15 @@ describe("entity and AEO surface", () => {
     expect(html).toBeTruthy();
     const org = jsonLdBlocks(html).find((b) => b["@type"] === "Organization");
     expect(org.founder.name).toBe("Avisekh Gurung");
-    expect(org.sameAs).toBeUndefined();
     expect(jsonLdBlocks(html).some((b) => b["@type"] === "AboutPage")).toBe(true);
+    // sameAs consolidates the entity so answer engines stop rebuilding it from stale directory listings. Every URL
+    // must be a profile that exists and is ours (see ORGANIZATION_SAME_AS): no bare domains, no placeholders, and
+    // not x.com/dealinsec, which 404s and is not our handle.
+    expect(org.sameAs).toEqual([...ORGANIZATION_SAME_AS]);
+    for (const url of org.sameAs) {
+      expect(url, url).toMatch(/^https:\/\/[a-z0-9.-]+\/[\w./-]+$/);
+      expect(url, url).not.toMatch(/x\.com|twitter\.com/);
+    }
   });
 
   it("no page links to a placeholder social profile", () => {

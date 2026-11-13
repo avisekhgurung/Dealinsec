@@ -32,6 +32,7 @@ import type { Express } from "express";
 import { esc } from "./tools/layout";
 import { AUDIENCE_LINE, ONE_LINER, PRICING } from "@shared/product-facts";
 import { renderCategoryPage, type CategoryPage } from "./category-pages";
+import { ORGANIZATION_SAME_AS } from "./site-head";
 
 export const REVIEWED_ON = "2026-09-26";
 
@@ -481,6 +482,7 @@ ${METHODOLOGY([vendor("bonsai")])}`,
         logo: "https://www.dealinsec.com/apple-touch-icon.png",
         email: "support@dealinsec.com",
         description: ONE_LINER,
+        sameAs: [...ORGANIZATION_SAME_AS],
         founder: { "@type": "Person", name: "Avisekh Gurung" },
         address: { "@type": "PostalAddress", addressLocality: "Darjeeling", addressRegion: "West Bengal", addressCountry: "IN" },
       },

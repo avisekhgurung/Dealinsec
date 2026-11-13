@@ -15,6 +15,25 @@ import { AUDIENCE_LINE, ONE_LINER, PRICING, PRODUCT_NAME, SUMMARY, SUPPORT_EMAIL
 export const SITE_ORIGIN = "https://www.dealinsec.com";
 export const ORGANIZATION_ID = `${SITE_ORIGIN}/#organization`;
 
+/**
+ * The other places on the web that are unambiguously this same organization (schema.org sameAs).
+ *
+ * Why it exists: without it, search and AI answer engines had nothing tying the site to its other properties, so they
+ * reconstructed the entity from whatever third-party listing they found — which is how Google's AI Overview came to
+ * describe DealInSec as a "deal-management, quote-to-cash platform" at ₹199/month, quoting a directory entry and the
+ * repository's old README instead of this site.
+ *
+ * Rule: every URL here must be a profile that EXISTS and that we control, checked before it is added. An invented or
+ * dead profile is worse than none — it teaches the engines that this list is unreliable. Checked 13 Nov 2026:
+ * Instagram and the GitHub repository both resolve. Deliberately absent: x.com/dealinsec (404 — the handle is not
+ * ours), and the LinkedIn company page (LinkedIn answers automated checks with 403, so it could not be confirmed;
+ * add it here once it is verified by hand).
+ */
+export const ORGANIZATION_SAME_AS: readonly string[] = [
+  "https://www.instagram.com/dealinsec",
+  "https://github.com/avisekhgurung/Dealinsec",
+];
+
 import { OUTBOUND_ALLOWANCE_DEFAULTS as OB, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
 
 const escapeAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -47,6 +66,7 @@ export function homeSchemas(): string {
       logo: `${SITE_ORIGIN}/apple-touch-icon.png`,
       email: SUPPORT_EMAIL,
       description: ONE_LINER,
+      sameAs: [...ORGANIZATION_SAME_AS],
     }),
     json({ "@context": "https://schema.org", "@type": "WebSite", "@id": `${SITE_ORIGIN}/#website`, name: PRODUCT_NAME, url: `${SITE_ORIGIN}/`, publisher: { "@id": ORGANIZATION_ID } }),
   ].join("\n    ");
