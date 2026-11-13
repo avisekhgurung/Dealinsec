@@ -9,7 +9,10 @@ import { DEAL_SUITE_LABEL } from "@shared/nav-model";
 import { SalesFunnel } from "@/components/outbound/sales-funnel";
 import { useAudience } from "@/hooks/use-audience";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { cn } from "@/lib/utils";
+import { resolveWorkMode, WORK_MODE_HINTS, WORK_MODE_LABELS, WORK_MODES, type WorkMode } from "@shared/work-mode";
+import { setWorkMode, useWorkMode } from "@/hooks/use-work-mode";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -170,7 +173,50 @@ function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | 
   );
 }
 
-// ─── helpers ────────────────────────────────────────────────────────────────
+/**
+ * Client Search | Deal Suite, as a radio group: the selected mode is always visible and arrow keys move between
+ * them. Switching only changes which numbers are drawn — every page stays reachable in either mode.
+ */
+function WorkModeTabs({ mode, onSelect }: { mode: WorkMode; onSelect: (m: WorkMode) => void }) {
+  const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  const move = (i: number) => {
+    const next = (i + WORK_MODES.length) % WORK_MODES.length;
+    refs.current[next]?.focus();
+    onSelect(WORK_MODES[next]);
+  };
+  return (
+    <div role="radiogroup" aria-label="What to show" className="inline-flex items-center gap-0.5 rounded-xl border border-neutral-200 bg-neutral-50 p-0.5 dark:border-neutral-800 dark:bg-neutral-900/60">
+      {WORK_MODES.map((m, i) => {
+        const on = m === mode;
+        return (
+          <button
+            key={m}
+            ref={(el) => { refs.current[i] = el; }}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            title={WORK_MODE_HINTS[m]}
+            tabIndex={on ? 0 : -1}
+            onClick={() => onSelect(m)}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); move(i + 1); }
+              if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); move(i - 1); }
+            }}
+            data-testid={`dashboard-mode-tab-${m}`}
+            className={cn(
+              "rounded-[10px] px-3 py-1.5 text-xs font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60",
+              on ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-800 dark:text-white" : "text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200",
+            )}
+          >
+            {WORK_MODE_LABELS[m]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── helpers ───────────────────────────────────────────────────────────────
 
 /** Ease-out count-up for KPI numerals — makes the dashboard feel alive on
  *  load without any chart-library weight. Snaps instantly for
@@ -662,6 +708,13 @@ export default function DashboardPage() {
   // A failed deals read is not "no deals yet": the empty list would put zeros
   // and the first-run empty state where the real numbers should be. With the deal suite hidden,
   // leads decide instead of deals (client/src/lib/first-run.ts says why).
+  // Where the person is wins over what they last chose; Leads, the bridge, never moves them (shared/work-mode.ts).
+  // Both hooks are called unconditionally — reading the remembered mode inside the ternary below would make it a
+  // conditional hook, which breaks the moment DEAL_SUITE_HIDDEN is ever flipped at runtime.
+  const [location] = useLocation();
+  const rememberedMode = useWorkMode();
+  const workMode: WorkMode = DEAL_SUITE_HIDDEN ? "find" : resolveWorkMode(location, rememberedMode);
+
   const firstRun = isFirstRun({
     leadTotal: leadCounts.isSuccess ? leadCounts.data.total : null,
     dealsKnown: !dealsLoading && !dealsError,
@@ -1387,25 +1440,28 @@ export default function DashboardPage() {
             <GettingStarted />
             {profileStripEl}
             {todayEl}
-            {/* TWO SIDES, SHOWN APART (13 Nov 2026, founder). Finding clients is the product and comes first; the
-                Deal Suite is a free part of it and gets its own heading below. Neither is folded into the other's
-                numbers, because they are two things a person can use without the other. */}
+            {/* TWO MODES, NEVER MIXED (13 Nov 2026, founder). One mode's numbers are read at a time: a deal count
+                beside a reply rate describes a funnel that does not exist, because each side is usable without the
+                other. Leads is the single bridge, so it is the one thing both modes show. */}
             {!isLoading && (
-              <section className="space-y-4 lg:space-y-5" aria-labelledby="dashboard-finding-title" data-testid="dashboard-finding">
-                <h2 id="dashboard-finding-title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Finding clients</h2>
-                {/* The pipeline's size, won and lost: a number to read, not a task, so it lives here. */}
-                <LeadsStrip />
-                {/* The client-finding funnel: researched → contacted → replied. */}
-                <SalesFunnel />
-              </section>
-            )}
-            {!isLoading && !DEAL_SUITE_HIDDEN && (
-              <section className="space-y-4 lg:space-y-5" aria-labelledby="dashboard-dealsuite-title" data-testid="dashboard-dealsuite">
-                <div className="flex items-baseline gap-2">
-                  <h2 id="dashboard-dealsuite-title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{DEAL_SUITE_LABEL}</h2>
-                  <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Free, included</span>
+              <section className="space-y-4 lg:space-y-5" aria-labelledby="dashboard-mode-title" data-testid={`dashboard-mode-${workMode}`}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 id="dashboard-mode-title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      {WORK_MODE_LABELS[workMode]}
+                      {workMode === "suite" && <span className="ml-2 normal-case tracking-normal text-emerald-700 dark:text-emerald-400">Free, included</span>}
+                    </h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">{WORK_MODE_HINTS[workMode]}</p>
+                  </div>
+                  {!DEAL_SUITE_HIDDEN && <WorkModeTabs mode={workMode} onSelect={setWorkMode} />}
                 </div>
-                {totalDeals > 0 ? (
+
+                {/* The bridge. A lead is where finding a client ends and won work begins, so it belongs to both. */}
+                <LeadsStrip />
+
+                {workMode === "find" ? (
+                  <SalesFunnel />
+                ) : totalDeals > 0 ? (
                   <>
                     {statsEl}
                     {analyticsEl}
