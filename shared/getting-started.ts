@@ -79,13 +79,6 @@ export interface ChecklistStep {
 
 const has = (n: number | null): boolean | null => (n === null ? null : n > 0);
 
-/** Either count above zero is enough; unknown only when neither says yes and
- *  at least one is unknown. */
-const either = (a: number | null, b: number | null): boolean | null => {
-  if ((a ?? 0) > 0 || (b ?? 0) > 0) return true;
-  return a === null || b === null ? null : false;
-};
-
 type Draft = Omit<ChecklistStep, "discovery"> & { module: keyof ChecklistAccess; discovery?: boolean };
 
 export function checklistFor(goal: FirstGoal | null, facts: Facts, can: ChecklistAccess): ChecklistStep[] {
@@ -122,25 +115,18 @@ export function checklistFor(goal: FirstGoal | null, facts: Facts, can: Checklis
         title: "Approve and send a first message",
         detail: "Review the drafted message, send it from your own email app, then mark it sent.",
       },
-      // Finding and winning the conversation is the goal; what follows is offered as the next thing to try.
-      ...(DEAL_SUITE_HIDDEN ? [] : [
-        firstDeal("Turn a reply into a deal", "When a company is interested, create a deal for the work."),
-        {
-          id: "quote_flow", module: "quotations", href: "/deals", done: has(facts.quotations), discovery: true,
-          title: "Then quote, agree terms and get paid",
-          detail: "From a deal you can send a quotation, get the agreement signed and track the invoice.",
-        } as Draft,
-      ]),
+      // Finding and winning the conversation IS this goal, start to end. The Deal Suite is a separate, free part of
+      // the product with its own goals below (manage_deals, get_paid); it is deliberately not bolted onto the end of
+      // this list, so neither side reads as a stage of the other (13 Nov 2026, founder).
     ];
   } else if (goal === "manage_deals") {
     drafts = [
-      {
-        id: "add_pipeline", module: "leads", href: "/leads", done: either(facts.leads, facts.deals),
-        title: "Add your first lead or deal",
-        detail: "Put a company you're talking to in your pipeline, so its next step isn't lost.",
-      },
+      // A Deal Suite goal starts in the Deal Suite. It used to open in Leads, from when the two sides were one
+      // funnel; that made the free paperwork read as a stage of finding clients, which it is not.
       firstDeal("Create a deal", "Record the client, the work and the amount."),
       sendQuote,
+      // The one pointer that stays, and only in this direction: the Deal Suite may send someone to the product.
+      // Nothing points the other way — finding clients is never presented as a route into the paperwork.
       discoverSearch,
     ];
   } else {

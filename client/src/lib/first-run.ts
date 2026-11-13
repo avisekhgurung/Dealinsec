@@ -1,11 +1,18 @@
 /**
- * Whether the dashboard treats this account as still setting up ("first run": setup cards first, no
- * insights yet). With the deal suite hidden (shared/flags.ts) deals can't be created, so the question
- * is whether any leads exist; keying on deals there would keep a working find-clients account on the
- * setup screen forever. A count that hasn't loaded (or couldn't) is never read as "none yet": the
- * deals rule stands, and a failed deals read is handled before this is asked.
+ * Whether the dashboard treats this account as still setting up ("first run": setup cards first, no insights yet).
+ *
+ * The two sides of the product are separate and either one counts as having started (13 Nov 2026): a person who is
+ * finding clients has leads and may never create a deal, and a person using the free Deal Suite has deals and may
+ * never run a search. Keying on deals alone kept a working find-clients account on the setup screen forever, which
+ * is the bug this rule exists to prevent.
+ *
+ * A count that hasn't loaded, or couldn't, is never read as "none yet". A failed deals read is handled before this
+ * is asked.
  */
-export function isFirstRun(o: { suiteHidden: boolean; leadTotal: number | null; dealsKnown: boolean; dealCount: number }): boolean {
-  if (o.suiteHidden && o.leadTotal !== null) return o.leadTotal === 0;
+export function isFirstRun(o: { leadTotal: number | null; dealsKnown: boolean; dealCount: number }): boolean {
+  if (o.leadTotal !== null && o.leadTotal > 0) return false;
+  if (o.dealsKnown && o.dealCount > 0) return false;
+  // Nothing on either side yet — but only say so once at least one of them has actually answered.
+  if (o.leadTotal !== null) return true;
   return o.dealsKnown && o.dealCount === 0;
 }

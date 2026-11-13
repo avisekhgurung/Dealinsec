@@ -65,9 +65,12 @@ describe("active route", () => {
 });
 
 describe("desktop sections", () => {
-  it("shows every area in workflow order for built-in roles", () => {
+  it("shows every area in workflow order, with Leads on the finding side and never beside Deals", () => {
     const s = desktopNavSections(OWNER);
-    expect(s.map((x) => x.label)).toEqual(["Home", "The Nest", "Client Radar", "Pipeline", "Documents", "Money"]);
+    expect(s.map((x) => x.label)).toEqual(["Home", "The Nest", "Finding clients", "Pipeline", "Documents", "Money"]);
+    // The split that matters: Leads belongs to finding clients, Deals to the Deal Suite. Never the same group.
+    expect(keys(s.find((x) => x.group === "outbound")!.items)).toEqual(["outbound", "leads"]);
+    expect(keys(s.find((x) => x.group === "pipeline")!.items)).toEqual(["deals"]);
     expect(s.flatMap((x) => keys(x.items))).toEqual(["home", "league", "outbound", "leads", "deals", "quotations", "agreements", "invoices"]);
   });
 

@@ -36,6 +36,7 @@ import {
   getTrialDaysLeft,
 } from "@shared/schema";
 import { NAV_ICONS, desktopBarItems, desktopMoreActive, desktopMoreSections, navItem, type NavSection } from "@/lib/nav";
+import { DEAL_SUITE_LABEL } from "@shared/nav-model";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { usePlanPrices, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
 
@@ -51,9 +52,9 @@ type PlanState =
 /** A label without its emoji ("Client Radar 🔎" → "Client Radar"), for the middle widths. */
 const plainLabel = (label: string) => label.replace(/\s*[\uD83C-\uD83E][\uDC00-\uDFFF]\uFE0F?/g, "").trim();
 
-/** "Workspace" at the end of the segment: Deals, then Documents (Quotations, Agreements) and Money (Invoices) — the
- *  win-and-bill side of the product, out of the way of finding clients. While one of them is
- *  open, the button wears its name and icon and is lit like a tab. */
+/** The Deal Suite at the end of the segment: Deals, then Documents (Quotations, Agreements) and Money (Invoices).
+ *  It is a free part of the product, kept out of the way of finding clients and named so the two read as two
+ *  things. While one of its pages is open, the button wears that page's name and icon and is lit like a tab. */
 function MoreMenu({ location, sections }: { location: string; sections: NavSection[] }) {
   const current = desktopMoreActive(location);
   const [open, setOpen] = useState(false);
@@ -62,12 +63,12 @@ function MoreMenu({ location, sections }: { location: string; sections: NavSecti
   const Icon = current ? NAV_ICONS[current.key] : MoreHorizontal;
   return (
     <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger aria-current={current ? "page" : undefined} data-testid="topnav-more" aria-label={current ? `Workspace: ${current.label}` : "Workspace"} title={current ? current.label : "Workspace"}
+      <DropdownMenuTrigger aria-current={current ? "page" : undefined} data-testid="topnav-more" aria-label={current ? `${DEAL_SUITE_LABEL}: ${current.label}` : DEAL_SUITE_LABEL} title={current ? current.label : DEAL_SUITE_LABEL}
         className="dis-topnav-tab relative flex h-9 shrink-0 items-center gap-2 rounded-xl px-2.5 xl:px-3 text-sm font-semibold whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60 data-[state=open]:bg-white/10">
         {current && <motion.span layoutId="topnav-pill" className="dis-topnav-pill absolute inset-0 rounded-xl" transition={tSpring} aria-hidden="true" />}
         <Icon className="relative h-[17px] w-[17px]" aria-hidden="true" />
         {/* On the narrowest desktops, an open page's icon alone; its name shows from xl (and always as the tooltip). */}
-        <span className={cn("relative", current && "hidden xl:inline")}>{current ? current.shortLabel : "Workspace"}</span>
+        <span className={cn("relative", current && "hidden xl:inline")}>{current ? current.shortLabel : DEAL_SUITE_LABEL}</span>
         <ChevronDown className="relative h-3.5 w-3.5 opacity-70" aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={10} className="w-60 rounded-xl p-1.5">
@@ -249,7 +250,7 @@ export function DesktopTopNav() {
           </Link>
           <span aria-hidden="true" className="self-center h-8 w-px mr-1 bg-gradient-to-b from-white/0 via-white/20 to-white/0" />
 
-          {/* ── The daily tabs, icon and name, in one segment; the win-and-bill side behind "Workspace" in the same segment ── */}
+          {/* ── The finding tabs, icon and name, in one segment; the Deal Suite behind its own menu in the same segment ── */}
           <nav aria-label="Sections" className="flex min-w-0 items-center pl-2">
             <div className="dis-topnav-seg flex items-center gap-0.5 rounded-2xl p-1">
               {desktopBarItems(user as any).map((item) => {

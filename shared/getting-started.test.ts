@@ -20,13 +20,15 @@ describe("isFirstGoal", () => {
 });
 
 describe("checklistFor ordering", () => {
-  it("find_clients starts at research and carries on into the work it wins", () => {
-    expect(ids("find_clients")).toEqual(["run_search", "add_lead", "first_message", "first_deal", "quote_flow"]);
-    // Finding clients is the goal; the paperwork that follows is the suggestion at the end, not part of it.
-    expect(checklistFor("find_clients", ZERO, ALL).filter((x) => x.discovery).map((x) => x.id)).toEqual(["quote_flow"]);
+  it("find_clients is the whole journey on its own: research, lead, first message — and no Deal Suite step", () => {
+    expect(ids("find_clients")).toEqual(["run_search", "add_lead", "first_message"]);
+    // The Deal Suite is a separate part of the product with its own goals; it is never a stage of this one.
+    expect(checklistFor("find_clients", ZERO, ALL).every((x) => !x.discovery)).toBe(true);
   });
-  it("manage_deals starts from the pipeline", () => {
-    expect(ids("manage_deals")).toEqual(["add_pipeline", "first_deal", "send_quote", "run_search"]);
+  it("manage_deals starts inside the Deal Suite, not in Leads", () => {
+    expect(ids("manage_deals")).toEqual(["first_deal", "send_quote", "run_search"]);
+    // Only the last step crosses over, and only this way: the Deal Suite may point at the product, never the reverse.
+    expect(checklistFor("manage_deals", ZERO, ALL).map((s) => s.discovery)).toEqual([false, false, true]);
   });
   it("get_paid runs deal → quote → agreement → invoice → payment, then suggests outbound", () => {
     expect(ids("get_paid")).toEqual(["first_deal", "send_quote", "agreement", "invoice", "record_payment", "run_search"]);
@@ -49,13 +51,13 @@ describe("checklistFor done flags", () => {
     expect(steps.find((s) => s.id === "add_lead")!.done).toBe(true);
     expect(steps.find((s) => s.id === "first_message")!.done).toBe(false);
   });
-  it("add_pipeline is done by a lead or a deal", () => {
-    const pipeline = (f: Partial<Facts>) => checklistFor("manage_deals", { ...ZERO, ...f }, ALL)[0].done;
-    expect(pipeline({})).toBe(false);
-    expect(pipeline({ leads: 1 })).toBe(true);
-    expect(pipeline({ deals: 1 })).toBe(true);
-    expect(pipeline({ leads: null, deals: 1 })).toBe(true);
-    expect(pipeline({ leads: null, deals: 0 })).toBe(null);
+  it("the Deal Suite goal's first step is the deal, and only deals decide it — a lead never does", () => {
+    const first = (f: Partial<Facts>) => checklistFor("manage_deals", { ...ZERO, ...f }, ALL)[0];
+    expect(first({}).id).toBe("first_deal");
+    expect(first({}).done).toBe(false);
+    expect(first({ leads: 1 }).done).toBe(false);
+    expect(first({ deals: 1 }).done).toBe(true);
+    expect(first({ deals: null }).done).toBe(null); // an unknown count is never 'not done'
   });
 });
 
@@ -65,13 +67,12 @@ describe("permissions", () => {
     expect(ids("get_paid", ZERO, invoicesOnly)).toEqual(["invoice", "record_payment"]);
     expect(ids("find_clients", ZERO, invoicesOnly)).toEqual([]);
   });
-  it("hides outbound and leads steps without access, leaving only what the person may reach", () => {
-    expect(ids("find_clients", ZERO, { ...ALL, outbound: false, leads: false })).toEqual(["first_deal", "quote_flow"]);
-    expect(ids("find_clients", ZERO, { ...ALL, outbound: false, leads: false, deals: false })).toEqual([]);
+  it("hides outbound and leads steps without access, which empties this goal entirely", () => {
+    expect(ids("find_clients", ZERO, { ...ALL, outbound: false, leads: false })).toEqual([]);
   });
   it("quotation steps follow deals unless quotations is given", () => {
-    expect(ids("manage_deals", ZERO, { ...ALL, deals: false })).toEqual(["add_pipeline", "run_search"]);
-    expect(ids("manage_deals", ZERO, { ...ALL, deals: false, quotations: true })).toEqual(["add_pipeline", "send_quote", "run_search"]);
+    expect(ids("manage_deals", ZERO, { ...ALL, deals: false })).toEqual(["run_search"]);
+    expect(ids("manage_deals", ZERO, { ...ALL, deals: false, quotations: true })).toEqual(["send_quote", "run_search"]);
   });
   it("an empty list counts as complete, so nothing is shown", () => {
     const none: ChecklistAccess = { outbound: false, leads: false, deals: false, agreements: false, invoices: false };

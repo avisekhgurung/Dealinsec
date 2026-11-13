@@ -5,6 +5,7 @@ import { GettingStarted } from "@/components/getting-started";
 import { LoadError } from "@/components/load-error";
 import { useAuth } from "@/hooks/useAuth";
 import { DEAL_SUITE_HIDDEN } from "@shared/flags";
+import { DEAL_SUITE_LABEL } from "@shared/nav-model";
 import { SalesFunnel } from "@/components/outbound/sales-funnel";
 import { useAudience } from "@/hooks/use-audience";
 import { useQuery } from "@tanstack/react-query";
@@ -571,9 +572,9 @@ export default function DashboardPage() {
     queryKey: ["/api/quotes"],
   });
 
-  // Lead counts, only to decide first-run while the deal suite is hidden (see firstRun below). The same
-  // query key as LeadsStrip's, so the strip's own read is reused, not repeated.
-  const leadCounts = useQuery<LeadList>({ queryKey: [leadListUrl({})], enabled: DEAL_SUITE_HIDDEN && canSeeModule(user as any, "deals"), retry: false });
+  // Lead counts, to decide first-run: finding clients is the product, so having leads means this account has
+  // started even with no deals. The same query key as LeadsStrip's, so the strip's own read is reused, not repeated.
+  const leadCounts = useQuery<LeadList>({ queryKey: [leadListUrl({})], enabled: canSeeModule(user as any, "deals"), retry: false });
 
   const isLoading = dealsLoading || contractsLoading || invoicesLoading;
 
@@ -662,7 +663,6 @@ export default function DashboardPage() {
   // and the first-run empty state where the real numbers should be. With the deal suite hidden,
   // leads decide instead of deals (client/src/lib/first-run.ts says why).
   const firstRun = isFirstRun({
-    suiteHidden: DEAL_SUITE_HIDDEN,
     leadTotal: leadCounts.isSuccess ? leadCounts.data.total : null,
     dealsKnown: !dealsLoading && !dealsError,
     dealCount: deals.length,
@@ -1274,12 +1274,14 @@ export default function DashboardPage() {
               <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 mx-auto mb-4">
                 <Briefcase className="w-8 h-8 text-muted-foreground" />
               </div>
-              <h3 className="font-semibold mb-1">{DEAL_SUITE_HIDDEN ? "No clients yet" : "No deals yet"}</h3>
+              {/* An account with nothing yet is pointed at the product, which is finding clients — never at the
+                  Deal Suite, which is the free part for work already won. Its button stays, second. */}
+              <h3 className="font-semibold mb-1">No clients yet</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                {DEAL_SUITE_HIDDEN ? "Describe who you want to work with, and your AI team finds companies that fit, with the evidence." : audience.emptyState}
+                Describe who you want to work with, and your AI team finds companies that fit, with the evidence.
               </p>
               <div className="flex flex-wrap items-center justify-center gap-2">
-                {/* Finding the client comes first; the deal button exists only while the deal suite is visible. */}
+                {/* Finding the client comes first; the Deal Suite button is the quieter second. */}
                 {canSeeOutbound && (
                   <Link href="/outbound">
                     <Button className="gradient-btn text-white" data-testid="button-empty-find-clients">
@@ -1316,8 +1318,8 @@ export default function DashboardPage() {
             <p className="hidden sm:block text-sm text-muted-foreground">Here's what needs your attention today.</p>
           </div>
           <div className="flex items-center gap-2 lg:gap-3">
-            {/* Finding clients is the primary action; the deal button exists only while the suite is visible
-                (shared/flags.ts). Desktop only: mobile already has Client Radar in the bottom bar. */}
+            {/* Finding clients is the primary action; the Deal Suite button is the quieter second.
+                Desktop only: mobile already has Client Radar in the bottom bar. */}
             {canCreateDeal && !DEAL_SUITE_HIDDEN && (
               <Link href="/deals/new" className="hidden lg:block">
                 <Button size="sm" variant="outline" className="font-semibold" data-testid="header-new-deal">
@@ -1376,13 +1378,8 @@ export default function DashboardPage() {
             {/* A brand-new account sees Today only when something real needs it — never an unearned "All clear". */}
             <TodayPanel hideWhenEmpty />
             {accountEl}
-            {/* With the deal suite hidden (shared/flags.ts), a fresh account sees no deal charts: finding clients is
-                the product. An account that already holds deals keeps its numbers below. */}
-            {!DEAL_SUITE_HIDDEN && statsEl}
-            {!DEAL_SUITE_HIDDEN && dealStatusEl}
-            {!DEAL_SUITE_HIDDEN && analyticsEl}
-            {!DEAL_SUITE_HIDDEN && chartsEl}
-            {!DEAL_SUITE_HIDDEN && recentEl}
+            {/* First run means nothing on either side yet, so every deal chart would be empty. The account sees what
+                to do instead; the numbers appear below once there is something to count. */}
             {emptyEl}
           </>
         ) : (
@@ -1390,24 +1387,51 @@ export default function DashboardPage() {
             <GettingStarted />
             {profileStripEl}
             {todayEl}
-            {!DEAL_SUITE_HIDDEN && statsEl}
+            {/* TWO SIDES, SHOWN APART (13 Nov 2026, founder). Finding clients is the product and comes first; the
+                Deal Suite is a free part of it and gets its own heading below. Neither is folded into the other's
+                numbers, because they are two things a person can use without the other. */}
             {!isLoading && (
-              <section className="space-y-4 lg:space-y-5" aria-labelledby="dashboard-insights-title" data-testid="dashboard-insights">
-                <h2 id="dashboard-insights-title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Insights</h2>
+              <section className="space-y-4 lg:space-y-5" aria-labelledby="dashboard-finding-title" data-testid="dashboard-finding">
+                <h2 id="dashboard-finding-title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Finding clients</h2>
                 {/* The pipeline's size, won and lost: a number to read, not a task, so it lives here. */}
                 <LeadsStrip />
-                {/* Finding clients is the product (shared/flags.ts): the insights are the client-finding funnel —
-                    researched → contacted → replied — not deal charts. */}
-                {DEAL_SUITE_HIDDEN ? <SalesFunnel /> : (
+                {/* The client-finding funnel: researched → contacted → replied. */}
+                <SalesFunnel />
+              </section>
+            )}
+            {!isLoading && !DEAL_SUITE_HIDDEN && (
+              <section className="space-y-4 lg:space-y-5" aria-labelledby="dashboard-dealsuite-title" data-testid="dashboard-dealsuite">
+                <div className="flex items-baseline gap-2">
+                  <h2 id="dashboard-dealsuite-title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{DEAL_SUITE_LABEL}</h2>
+                  <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Free, included</span>
+                </div>
+                {totalDeals > 0 ? (
                   <>
+                    {statsEl}
                     {analyticsEl}
                     {chartsEl}
                     {dealStatusEl}
+                    {recentEl}
                   </>
+                ) : (
+                  /* Nothing to chart yet. Say what the suite is for rather than showing five empty cards. */
+                  <Card className="glass-card">
+                    <CardContent className="p-4 flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-emerald-500/10">
+                        <FileSignature className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm">Deals, quotations, agreements and invoices</p>
+                        <p className="text-xs text-muted-foreground">For work you have already won. Free on every plan, with no monthly cap.</p>
+                      </div>
+                      <Link href="/deals">
+                        <Button size="sm" variant="outline" className="flex-shrink-0" data-testid="dashboard-dealsuite-cta">Open</Button>
+                      </Link>
+                    </CardContent>
+                  </Card>
                 )}
               </section>
             )}
-            {!DEAL_SUITE_HIDDEN && recentEl}
             <section className="space-y-4" aria-label="Account and setup" data-testid="dashboard-account">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Account</h2>
               {accountEl}

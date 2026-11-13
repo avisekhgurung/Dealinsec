@@ -1,11 +1,13 @@
 /**
  * Signed-in navigation model — the one list both bars read.
  *
- * The product has six areas, in workflow order: Home · The Nest (the AI team: Nibo, Mika, Zee) · Client Radar ·
- * Pipeline (Leads, Deals) · Documents (Quotations, Agreements) · Money
- * (Invoices — payment status is tracked inside invoices). Account (Profile,
- * Settings) sits outside the five: on desktop it lives in the bar's right-hand
- * controls, on mobile in the "More" sheet.
+ * TWO SIDES, DELIBERATELY APART (13 Nov 2026). Finding clients is the product and owns the bar: Home · The Nest
+ * (Nibo, Mika, Zee) · Client Radar · Leads. The Deal Suite — Deals, Quotations, Agreements, Invoices — is a free
+ * part of the product, not the product, and lives behind one menu of its own (DEAL_SUITE_GROUPS). Leads belongs to
+ * the finding side and must never share a group with Deals: a reader who sees them together reads one funnel, and
+ * the point of the split is that these are two things a person can use without the other.
+ *
+ * Account (Profile, Settings) sits outside both: on desktop in the bar's right-hand controls, on mobile in "More".
  *
  * Pure on purpose (no React, no icons) so the active-route rules and the
  * permission filtering are unit-tested; client/src/lib/nav.ts maps keys to
@@ -37,7 +39,7 @@ type NavUser = Parameters<typeof canSeeModule>[0];
 export const NAV_GROUP_LABELS: Record<NavGroup, string> = {
   home: "Home",
   league: "The Nest",
-  outbound: "Client Radar",
+  outbound: "Finding clients",
   pipeline: "Pipeline",
   documents: "Documents",
   money: "Money",
@@ -74,7 +76,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   def({ key: "home", label: "Home", shortLabel: "Home", href: "/dashboard", group: "home" }),
   def({ key: "league", label: "The Nest 🪺", shortLabel: "The Nest", href: "/ai-league", group: "league", module: "deals" }),
   def({ key: "outbound", label: "Client Radar 🔎", shortLabel: "Radar", href: "/outbound", group: "outbound", module: "deals" }),
-  def({ key: "leads", label: "Leads", shortLabel: "Leads", href: "/leads", group: "pipeline", module: "deals" }),
+  def({ key: "leads", label: "Leads", shortLabel: "Leads", href: "/leads", group: "outbound", module: "deals" }),
   def({ key: "deals", label: "Deals", shortLabel: "Deals", href: "/deals", group: "pipeline", module: "deals" }),
   def({ key: "quotations", label: "Quotations", shortLabel: "Quotes", href: "/quotations", group: "documents", module: "quotations" }),
   def({ key: "agreements", label: "Agreements", shortLabel: "Agreements", href: "/contracts", group: "documents", module: "agreements" }),
@@ -131,8 +133,12 @@ export const DESKTOP_BAR_KEYS: readonly NavKey[] = ["home", "league", "outbound"
 export function desktopBarItems(user: NavUser): NavItem[] {
   return DESKTOP_BAR_KEYS.map(navItem).filter((i) => canSeeNavItem(user, i));
 }
-export const DESKTOP_MORE_GROUPS: readonly NavGroup[] = DEAL_SUITE_HIDDEN ? [] : ["pipeline", "documents", "money"];
-/** The Workspace menu: the win-and-bill side. Pipeline shows only Deals here (Leads has its own tab). */
+/** The Deal Suite: the free, self-contained win-and-bill side. Nothing from the finding side belongs in here. */
+export const DEAL_SUITE_GROUPS: readonly NavGroup[] = ["pipeline", "documents", "money"];
+/** What the menu holding it is called, in both bars. One name, so the two sides read as two things. */
+export const DEAL_SUITE_LABEL = "Deal Suite";
+export const DESKTOP_MORE_GROUPS: readonly NavGroup[] = DEAL_SUITE_HIDDEN ? [] : DEAL_SUITE_GROUPS;
+/** The Deal Suite menu. Pipeline shows only Deals here — Leads is a finding tab and is filtered out below. */
 export function desktopMoreSections(user: NavUser): NavSection[] {
   return sections(user, DESKTOP_MORE_GROUPS)
     .map((s) => ({ ...s, items: s.items.filter((i) => !DESKTOP_BAR_KEYS.includes(i.key)) }))
@@ -143,7 +149,7 @@ export function desktopMoreActive(path: string): NavItem | null {
   return NAV_ITEMS.find((i) => DESKTOP_MORE_GROUPS.includes(i.group) && !DESKTOP_BAR_KEYS.includes(i.key) && i.isActive(path)) ?? null;
 }
 
-export const MORE_GROUPS: readonly NavGroup[] = DEAL_SUITE_HIDDEN ? ["account"] : ["pipeline", "documents", "money", "account"];
+export const MORE_GROUPS: readonly NavGroup[] = DEAL_SUITE_HIDDEN ? ["account"] : [...DEAL_SUITE_GROUPS, "account"];
 /** The More sheet: everything not already in the bar (Pipeline shows Deals; Leads is in the bar). */
 export function moreSheetSections(user: NavUser): NavSection[] {
   return sections(user, MORE_GROUPS)

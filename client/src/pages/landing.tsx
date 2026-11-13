@@ -58,6 +58,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { trackEvent } from "@/lib/analytics";
 import { PRICING } from "@shared/product-facts";
 import { OUTBOUND_ALLOWANCE_DEFAULTS, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
+import { DEAL_SUITE_LABEL } from "@shared/nav-model";
 import { PRO_INCLUDED_SEATS } from "@shared/permissions";
 import { openConsentSettings } from "@/lib/consent";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
@@ -696,6 +697,8 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
     "Lead pipeline: save researched prospects as leads, with follow-ups",
     "Nibo, Mika and Zee: AI coworker tasks included",
     `AI outreach drafts: ${free.monthlyDrafts} every ${OUTBOUND_WINDOW_DAYS} days, which you approve and send yourself`,
+    // Last on purpose: the Deal Suite is a free part of the product, not the product. Finding clients leads.
+    `${DEAL_SUITE_LABEL}: deals, quotations, agreements signed online, invoices and payment tracking — free, no monthly cap`,
   ];
   const proMonthlyPerks = [
     `AI client research: ${pro.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${pro.maxCompanies} companies each`,

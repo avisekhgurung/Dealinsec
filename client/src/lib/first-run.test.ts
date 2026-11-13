@@ -2,18 +2,16 @@ import { describe, expect, it } from "vitest";
 import { isFirstRun } from "./first-run";
 
 describe("the dashboard's first-run rule", () => {
-  it("with the deal suite hidden, leads decide: an account with leads sees its insights even with zero deals", () => {
-    expect(isFirstRun({ suiteHidden: true, leadTotal: 3, dealsKnown: true, dealCount: 0 })).toBe(false);
-    expect(isFirstRun({ suiteHidden: true, leadTotal: 0, dealsKnown: true, dealCount: 0 })).toBe(true);
+  it("either side counts as having started: leads alone, or deals alone", () => {
+    // The bug this prevents: a working find-clients account with no deals, stuck on the setup screen.
+    expect(isFirstRun({ leadTotal: 3, dealsKnown: true, dealCount: 0 })).toBe(false);
+    expect(isFirstRun({ leadTotal: 0, dealsKnown: true, dealCount: 1 })).toBe(false);
+    expect(isFirstRun({ leadTotal: 0, dealsKnown: true, dealCount: 0 })).toBe(true);
   });
-  it("a lead count that hasn't loaded is not 'none yet': the deals rule stands", () => {
-    expect(isFirstRun({ suiteHidden: true, leadTotal: null, dealsKnown: true, dealCount: 0 })).toBe(true);
-    expect(isFirstRun({ suiteHidden: true, leadTotal: null, dealsKnown: true, dealCount: 2 })).toBe(false);
-    expect(isFirstRun({ suiteHidden: true, leadTotal: null, dealsKnown: false, dealCount: 0 })).toBe(false);
-  });
-  it("with the suite visible, deals decide, and loading or failed deals are never read as none", () => {
-    expect(isFirstRun({ suiteHidden: false, leadTotal: 5, dealsKnown: true, dealCount: 0 })).toBe(true);
-    expect(isFirstRun({ suiteHidden: false, leadTotal: 0, dealsKnown: true, dealCount: 1 })).toBe(false);
-    expect(isFirstRun({ suiteHidden: false, leadTotal: 0, dealsKnown: false, dealCount: 0 })).toBe(false);
+  it("a count that hasn't loaded is never read as 'none yet'", () => {
+    expect(isFirstRun({ leadTotal: null, dealsKnown: true, dealCount: 0 })).toBe(true); // deals answered: none
+    expect(isFirstRun({ leadTotal: null, dealsKnown: true, dealCount: 2 })).toBe(false);
+    expect(isFirstRun({ leadTotal: null, dealsKnown: false, dealCount: 0 })).toBe(false); // neither answered
+    expect(isFirstRun({ leadTotal: 0, dealsKnown: false, dealCount: 0 })).toBe(true); // leads answered: none
   });
 });
