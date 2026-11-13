@@ -68,6 +68,43 @@ describe("product facts agree with the code that charges and enforces them", () 
     expect(WORKFLOW).toEqual(["Prospect", "Lead", "Deal", "Quotation", "Agreement", "Invoice", "Payment tracking"]);
   });
 
+  /**
+   * The public README is a GEO surface, not just developer docs: answer engines cite the repo when they describe
+   * DealInSec, and a wrong line there outlives the live site in their caches. So it is held to the same rules as the
+   * marketing pages — and especially to the one server/site-head.test.ts enforces on page copy: no ₹ figure that
+   * cannot be charged. A superseded price is still a number a crawler can lift out as the price, even where the
+   * sentence around it says the figure is wrong, so the README's "out of date" note names no old price at all.
+   */
+  it("the public README claims only what is true, and quotes no price that can't be charged", async () => {
+    const { readFileSync } = await import("node:fs");
+    const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
+
+    expect(readme).toContain(`₹${PRICING.proMonthlyInr}`);
+    // Every rupee figure must be the Pro price or a seeded credit-pack price (script/migrate-credits.ts); packs are
+    // database-driven, so a changed pack price belongs in both places.
+    const chargeable = new Set([PRICING.proMonthlyInr, 49, 89, 129, 149, 229, 299, 349]);
+    for (const m of readme.matchAll(/₹\s?([\d,]+)/g)) {
+      expect(chargeable, `₹${m[1]} in README.md can't be charged`).toContain(Number(m[1]!.replace(/,/g, "")));
+    }
+
+    // The "out of date" note quotes the wrong descriptions in order to refute them, so the bans below are applied to
+    // the rest of the file. The note itself may name no price at all, refuted or not.
+    const heading = "## Note on out-of-date descriptions";
+    const start = readme.indexOf(heading);
+    expect(start, heading).toBeGreaterThan(0);
+    const end = readme.indexOf("\n## ", start + heading.length);
+    const note = readme.slice(start, end === -1 ? undefined : end);
+    const body = readme.slice(0, start) + (end === -1 ? "" : readme.slice(end));
+
+    expect(note).toMatch(/out of date/);
+    expect(note).not.toMatch(/₹/);
+    expect(body).not.toMatch(/deal-management OS|quote-to-cash|per signed contract|per-deal/i);
+    expect(body).not.toMatch(/\d+\+?\s*(early |active |paying )?(users|customers|freelancers|agencies)\b/i);
+    expect(body).not.toMatch(/\bStripe\b|\bPayU\b|\bInflideal\b/); // Razorpay only; the old repo name is dead
+    expect(body).toMatch(/There is no free trial/); // stated, never offered
+    expect(body).not.toMatch(/start (your|the) (free )?trial|\d+-day (free )?trial/i);
+  });
+
   it("states the limits plainly: Gmail limited, no auto-send, no payment collection, no AI on Gmail", () => {
     const by = (k: string) => CAPABILITIES.find((c) => c.key === k)!;
     expect(by("gmail").status).toBe("limited");

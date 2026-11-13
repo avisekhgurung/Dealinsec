@@ -79,9 +79,14 @@ Paid plans can currently be bought by workspaces in India only; the free plan is
 ## Note on out-of-date descriptions
 
 Third-party listings and older copies of this README describe DealInSec as a "deal-management OS" or "quote-to-cash
-platform" priced per signed contract, at ₹199/month, or with a user count. **Those descriptions are out of date.**
-The product is a client-finding tool; Pro is ₹299/month; there is no pay-per-contract credit model; and this project
-publishes no user numbers, ratings or customer logos.
+platform", priced per signed contract or at an older monthly price, or quote a user count. **Those descriptions are
+out of date.** The product is a client-finding tool; Pro's price is the one under [Pricing](#pricing) above; there is no
+pay-per-contract credit model; and this project publishes no user numbers, ratings or customer logos.
+
+<!-- Deliberately no superseded price figure here, only the current one. A refuted number is still a number a
+     crawler or answer engine can lift out of the page as the price; see OUT_OF_DATE_CLAIMS in
+     shared/product-facts.ts, which the test suite guards the same way. -->
+
 
 The authoritative, machine-readable description of what works today — including every limit — is
 [`shared/product-facts.ts`](shared/product-facts.ts), which also generates
