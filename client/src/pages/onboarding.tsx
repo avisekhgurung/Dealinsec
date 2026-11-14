@@ -26,6 +26,7 @@ import { hasPendingOutboundPrefill } from "@/lib/outbound-prefill";
 import { trackEvent } from "@/lib/analytics";
 import { setFirstGoal, setTargetMarket, TARGET_MARKETS, type TargetMarket } from "@/lib/first-goal";
 import { destinationFor, type FirstGoal } from "@shared/getting-started";
+import { ConnectEmailStep } from "@/components/onboarding/connect-email-step";
 
 /**
  * What the chosen country changes on this screen. Data, not a branch: a country
@@ -83,6 +84,9 @@ const STEPS = [
   { key: "role", label: "Your work" },
   { key: "personal", label: "About you" },
   { key: "regional", label: "Country & billing" },
+  // The last step, after the workspace is already saved: connecting an email is useful, never required, and
+  // "Skip for now" is a first-class button rather than a link nobody can find.
+  { key: "email", label: "Your email" },
 ] as const;
 
 /** Step content: slides in from the side it was navigated from and fades. The
@@ -108,6 +112,8 @@ export default function OnboardingPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [step, setStep] = useState(0);
+  /** Where the person goes once the last step is done; set when the workspace is saved. */
+  const [afterOnboarding, setAfterOnboarding] = useState<string>("/");
   // +1 moving forward, -1 back: which side the next step slides in from.
   const [dir, setDir] = useState(1);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -277,15 +283,19 @@ export default function OnboardingPage() {
 
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       const restoring = hasPendingDealPrefill() || hasPendingOutboundPrefill();
+      // The workspace is saved and onboarding is complete at this point. The email step that follows can be left at
+      // any time, including by closing the tab, and nothing is lost.
+      setAfterOnboarding(restoring ? postAuthDestination() : destinationFor(goal));
       toast({
         title: `You're all set, ${firstName}`,
         description: restoring
           ? "Picking up right where you left off."
           : `Your workspace is ready. We'll ask for your ${rules.taxIdLabel}, bank details and signature only when you need them.`,
       });
-      // A demo deal waiting to be finished wins over the goal: it is work the
-      // person already started.
-      setLocation(restoring ? postAuthDestination() : destinationFor(goal));
+      // A demo deal waiting to be finished wins over the goal: it is work the person already started. The person goes
+      // there from the email step, whether they connect one or skip it.
+      trackEvent("onboarding_step_completed", { step: 4 });
+      go(3);
     } catch (error: any) {
       toast({
         title: "Couldn't save your details",
@@ -651,6 +661,21 @@ export default function OnboardingPage() {
                     </Button>
                   </motion.div>
                 </motion.form>
+              )}
+
+              {step === 3 && (
+                <motion.div
+                  key="step-email"
+                  custom={dir}
+                  variants={stepVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  className="space-y-6"
+                  data-testid="onboarding-step-email"
+                >
+                  <ConnectEmailStep onDone={() => setLocation(afterOnboarding)} />
+                </motion.div>
               )}
             </AnimatePresence>
           </div>
