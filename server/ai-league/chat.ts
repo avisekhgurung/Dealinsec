@@ -27,7 +27,10 @@ type StartFn = (user: any, task: LeagueTask, input: unknown, idemKey: string) =>
 /** The agent's own tools each coworker may use (reads, mostly). Anything else is simply not offered to the model. */
 export const BOT_TOOLS: Record<Bot, readonly string[]> = {
   nibo: ["list_leads", "get_lead", "get_ideal_client", "parse_icp", "get_discovery_run", "get_prospect_intelligence", "assess_lead_fit", "list_client_profiles"],
-  mika: ["list_leads", "get_lead", "get_lead_followups", "get_lead_score", "get_outreach_draft", "search_deals", "get_deal", "get_workflow_status", "list_campaigns", "get_campaign"],
+  // get_ideal_client and list_client_profiles are Mika's too, not only Nibo's: she is the one who writes, and what a
+  // message may say about the sender comes from the ideal client alone (server/sales/outreach-prompt.ts). Without them
+  // she discussed and planned outreach with no idea what the workspace sells, and said so in the person's own words.
+  mika: ["list_leads", "get_lead", "get_lead_followups", "get_lead_score", "get_outreach_draft", "get_ideal_client", "list_client_profiles", "search_deals", "get_deal", "get_workflow_status", "list_campaigns", "get_campaign"],
   zee: ["get_pending_work", "get_money_radar", "search_invoices", "search_quotations", "search_agreements", "get_lead_followups", "get_deal_health", "get_recent_activity", "get_account_status", "list_campaigns", "get_campaign"],
 };
 
@@ -323,6 +326,8 @@ ${bot === "nibo" ? `- For big or overnight research (many companies, "work tonig
 - The person may have saved client profiles (who they want as clients). When they name one, or ask to search for a kind of client they have saved, call list_client_profiles and start ${tool} with that profile's id as profileId and one of ITS kinds of company as kind: the search is then built from the profile exactly, and you must not add or change anything it says. If the profile has several kinds of company and they didn't say which, ask which one.
 - When the person wants to write to the companies a search found (a campaign, "message all of them"), hand them to ${BOT_IDENTITY.mika.name} with handoff_nibo_to_mika_campaign and that search's id as runId (get_discovery_run lists your searches with their ids). Only companies saved to Leads can be in a campaign, so say that if the search saved none.
 ` : ""}${bot === "mika" ? `- For a campaign (a group of leads written to together), or drafts for more than ${LEAGUE_LIMITS.draftsPerRun} leads, use league_mika_campaign; for a few leads use ${tool}. Questions about how a campaign is doing: list_campaigns, then get_campaign. You never approve a draft and never start a campaign's sending: those are the person's own clicks in Client Radar → Campaigns.
+- Before you write, suggest or judge ANY message, call get_ideal_client. What it holds is what the person sells and who they want, in their own words, and it is the only source for anything a message says about them: never add a service, a speciality, a years-of-experience or a result they did not write there. When they ask about a kind of client they have saved, or a lead that came from a saved profile, call list_client_profiles as well and keep to what that profile says it sells those clients.
+- If get_ideal_client comes back empty, say that plainly before anything else and ask them to fill in "Ideal client & what you offer" in Settings: until they do, a draft can say nothing at all about who they are, which is why messages come back sounding generic.
 ` : ""}${bot === "zee" ? `- Questions about campaigns (how one is doing, what needs doing in it, why it paused): list_campaigns, then get_campaign. Report the numbers as they are; a reply rate is unknown until something was sent. You never see what an email says: for replies you know only how many there are and how the rules labelled them, so send the person to the Inbox to read them.
 ` : ""}- You only have the tools you are given. For other work, point the person to ${others}, or to the right page.
 - Nothing is ever sent to anyone by you. Drafts wait for the person's approval.

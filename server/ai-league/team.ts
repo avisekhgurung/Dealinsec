@@ -28,6 +28,9 @@ export const FACT_READS: Record<Bot, { tool: string; input: Record<string, unkno
     { tool: "list_leads", input: { limit: 10 }, label: "Newest leads" },
   ],
   mika: [
+    // The ideal client first: a teammate asking Mika about messaging gets an answer grounded in what the workspace
+    // actually sells, the same source a draft is allowed to describe the sender from.
+    { tool: "get_ideal_client", input: {}, label: "Ideal client" },
     { tool: "list_leads", input: { limit: 15 }, label: "Leads" },
     { tool: "get_lead_followups", input: { days: 7 }, label: "Follow-ups due in the next 7 days" },
   ],

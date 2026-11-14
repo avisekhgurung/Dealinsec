@@ -145,7 +145,9 @@ describe("who is told what", () => {
     expect(BOT_TOOLS.nibo).toContain("list_client_profiles");
     expect(BOT_TOOLS.nibo).not.toContain("list_campaigns");
     for (const bot of ["mika", "zee"] as const) { expect(BOT_TOOLS[bot]).toContain("list_campaigns"); expect(BOT_TOOLS[bot]).toContain("get_campaign"); }
-    expect(BOT_TOOLS.mika).not.toContain("list_client_profiles");
+    // Mika has the profile reads too, since 14 Nov 2026: she writes, and a message may describe the sender only from
+    // the ideal client. Starting a search from a profile is still Nibo's alone (profileId goes to nibo.find_clients).
+    for (const t of ["get_ideal_client", "list_client_profiles"]) expect(BOT_TOOLS.mika).toContain(t);
   });
   it("Nibo is told to search from a profile exactly; Mika that she never approves or starts sending; Zee that she never sees an email", () => {
     const nibo = personaPrompt("nibo", []), mika = personaPrompt("mika", []), zee = personaPrompt("zee", []);
@@ -154,7 +156,10 @@ describe("who is told what", () => {
     expect(mika).toMatch(/league_mika_campaign/);
     expect(mika).toMatch(/You never approve a draft and never start a campaign's sending/);
     expect(zee).toMatch(/You never see what an email says/);
-    expect(mika).not.toMatch(/list_client_profiles/);
+    expect(mika).toMatch(/Before you write, suggest or judge ANY message, call get_ideal_client/);
+    expect(mika).toMatch(/never add a service, a speciality, a years-of-experience or a result they did not write there/);
+    expect(mika).toMatch(/If get_ideal_client comes back empty/);
+    expect(mika).not.toMatch(/must not add or change anything it says/); // searching from a profile stays Nibo's
     expect(zee).not.toMatch(/league_mika_campaign/);
     for (const p of [nibo, mika, zee]) expect(p).toMatch(/Nothing is ever sent to anyone by you/);
   });
