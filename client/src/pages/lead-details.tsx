@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useRoute, useSearch } from "wouter";
-import { AlertTriangle, ArrowLeft, Archive, ArrowRight, Check, CircleHelp, ExternalLink, Handshake, Lightbulb, Pencil, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, RotateCcw, Trash2, Check, CircleHelp, ExternalLink, Handshake, Lightbulb, Pencil, Sparkles } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { DetailSkeleton, DetailUnavailable } from "@/components/document/detail-states";
 import { FitCard } from "@/components/leads/fit-card";
@@ -148,7 +148,9 @@ export default function LeadDetailsPage() {
     },
     onError: (e) => { refreshLeads(); fail(e); },
   });
-  const archive = useMutation({ mutationFn: () => leadCall("POST", `/api/leads/${id}/archive`), onSuccess: () => { refreshLeads(); toast({ title: "Lead archived" }); setLocation("/leads"); }, onError: fail });
+  // "Delete" is the archive: the row and its history stay, and the Deleted view can restore it.
+  const archive = useMutation({ mutationFn: () => leadCall("POST", `/api/leads/${id}/archive`), onSuccess: () => { refreshLeads(); toast({ title: "Lead deleted", description: "It's out of your pipeline. Find it under Deleted in Leads to restore it." }); setLocation("/leads"); }, onError: fail });
+  const restore = useMutation({ mutationFn: () => leadCall("POST", `/api/leads/${id}/restore`), onSuccess: () => { refreshLeads(); toast({ title: "Lead restored" }); }, onError: fail });
   const convert = useMutation({
     mutationFn: () => {
       const amount = Number(dealAmount.replace(/,/g, ""));
@@ -231,7 +233,7 @@ export default function LeadDetailsPage() {
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <StageBadge status={lead.status} />
                 <SourceChip source={lead.source} mine={mine} />
-                {lead.archivedAt && <span className="text-xs text-muted-foreground">Archived</span>}
+                {lead.archivedAt && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground" data-testid="lead-deleted">Deleted</span>}
                 {lead.doNotContact && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">Do not contact</span>}
               </div>
               {/* The lead's own source and the day it was added: nothing here is inferred. */}
@@ -243,6 +245,9 @@ export default function LeadDetailsPage() {
               )}
               {canEdit && !lead.archivedAt && (
                 <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} data-testid="button-edit-lead"><Pencil className="mr-1.5 h-3.5 w-3.5" />Edit</Button>
+              )}
+              {canEdit && lead.archivedAt && (
+                <Button variant="outline" size="sm" onClick={() => restore.mutate()} disabled={restore.isPending} data-testid="button-restore-lead"><RotateCcw className="mr-1.5 h-3.5 w-3.5" />Restore</Button>
               )}
             </div>
           </div>
@@ -348,9 +353,9 @@ export default function LeadDetailsPage() {
               )}
             </CardContent></Card>
             {canEdit && !lead.archivedAt && (
-              <Button variant="ghost" size="sm" className="mt-3 text-muted-foreground" data-testid="button-archive-lead"
-                onClick={async () => { if (await confirm({ title: "Archive this lead?", description: "It leaves your pipeline but is kept, and nothing is deleted.", confirmText: "Archive" })) archive.mutate(); }}>
-                <Archive className="mr-1.5 h-3.5 w-3.5" />Archive lead
+              <Button variant="ghost" size="sm" className="mt-3 text-muted-foreground hover:text-rose-600" data-testid="button-archive-lead"
+                onClick={async () => { if (await confirm({ title: "Delete this lead?", description: "It leaves your pipeline and lists. Its facts, messages and history are kept, and you can restore it from Deleted in Leads.", confirmText: "Delete", destructive: true })) archive.mutate(); }}>
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete lead
               </Button>
             )}
           </TabsContent>

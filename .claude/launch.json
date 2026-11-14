@@ -73,6 +73,15 @@
         "DATABASE_URL=postgresql://dealtest@localhost:5544/dealinsec_pdftest GOOGLE_PLACES_API_KEY=fake-local-test GOOGLE_PLACES_URL=http://127.0.0.1:4011/v1/places:searchText PORT=3000 npm run dev"
       ],
       "port": 3000
+    },
+    {
+      "name": "dealinsec-local-db-3001",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "DATABASE_URL=postgresql://dealtest@localhost:5544/dealinsec_pdftest PORT=3001 npm run dev"
+      ],
+      "port": 3001
     }
   ]
 }

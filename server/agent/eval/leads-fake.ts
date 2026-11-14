@@ -41,7 +41,7 @@ export class FakeLeadsStore implements LeadsStore {
   async list(orgId: string, o: ListOptions): Promise<{ rows: LeadRow[]; total: number }> {
     const q = o.q?.trim().toLowerCase();
     const all = this.leads
-      .filter((l) => l.organizationId === orgId && (o.includeArchived || !l.archivedAt) && (!o.status || l.status === o.status)
+      .filter((l) => l.organizationId === orgId && (o.archivedOnly ? !!l.archivedAt : o.includeArchived || !l.archivedAt) && (!o.status || l.status === o.status)
         && (!q || l.companyName.toLowerCase().includes(q) || (l.domain ?? "").includes(q)))
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime() || b.id - a.id);
     const rows = all.slice(o.offset, o.offset + o.limit).map((l): LeadRow => {
@@ -133,6 +133,13 @@ export class FakeLeadsStore implements LeadsStore {
     if (!lead || lead.archivedAt || lead.converting) return null;
     Object.assign(lead, { archivedAt: this.now(), updatedAt: this.now() });
     return { ...lead };
+  }
+
+  async restore(orgId: string, id: number): Promise<Lead | null> {
+    const lead = this.leads.find((l) => l.organizationId === orgId && l.id === id);
+    if (!lead || !lead.archivedAt) return null;
+    Object.assign(lead, { archivedAt: null, updatedAt: this.now() });
+    return lead;
   }
 
   async addEvent(orgId: string, leadId: number, e: Parameters<LeadsStore["addEvent"]>[2]) {

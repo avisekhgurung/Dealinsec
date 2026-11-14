@@ -12,7 +12,8 @@
  *   PATCH  /api/leads/:id/tickets/:tid     mark a ticket done or cancelled
  *   POST   /api/leads/:id/claims           record a fact about the company (confirmed ones need evidence)
  *   POST   /api/leads/:id/convert          close as WON by creating the deal
- *   POST   /api/leads/:id/archive          archive
+ *   POST   /api/leads/:id/archive          delete (soft: archived, restorable)
+ *   POST   /api/leads/:id/restore          undo the delete
  *
  * Every rule lives in server/services/leads.ts; a route only parses the request
  * and maps the result to HTTP. Organization and user come from the session, and
@@ -102,10 +103,10 @@ export function registerLeadRoutes(app: Express) {
       const q = z.object({
         status: z.string().optional(), q: z.string().max(100).optional(),
         limit: z.coerce.number().int().optional(), offset: z.coerce.number().int().optional(),
-        archived: z.enum(["1", "true"]).optional(),
+        archived: z.enum(["1", "true", "only"]).optional(),
       }).safeParse(req.query);
       if (!q.success) return res.status(400).json({ code: "invalid", error: "Invalid filter." });
-      send(res, await leads.listLeads(req.user, { ...q.data, includeArchived: !!q.data.archived }));
+      send(res, await leads.listLeads(req.user, { ...q.data, includeArchived: !!q.data.archived, archivedOnly: q.data.archived === "only" }));
     } catch (err) {
       agentLog("error", { errorType: (err as Error)?.name ?? "Error", where: "leads_list" });
       res.status(500).json({ code: "internal", error: "Couldn't load your leads." });
@@ -146,6 +147,7 @@ export function registerLeadRoutes(app: Express) {
   app.post("/api/leads/:id/convert", ...guard, withId(async (req, res, id) => send(res, await leads.convertToDeal(req.user, id, req.body))));
 
   app.post("/api/leads/:id/archive", ...guard, withId(async (req, res, id) => send(res, await leads.archiveLead(req.user, id))));
+  app.post("/api/leads/:id/restore", ...guard, withId(async (req, res, id) => send(res, await leads.restoreLead(req.user, id))));
 
   // A route with no :id still needs the same last-resort handling.
   function withId2(handler: (req: any, res: Response) => Promise<unknown>) {

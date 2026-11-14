@@ -40,11 +40,11 @@ export const STAGE_STYLE: Record<LeadStatus, string> = {
 
 export const stageLabel = (s: string) => leadStatusLabels[s as LeadStatus] ?? s;
 
-export const listUrl = (o: { status?: string; q?: string; archived?: boolean }) => {
+export const listUrl = (o: { status?: string; q?: string; archived?: boolean | "only" }) => {
   const p = new URLSearchParams({ limit: "100" });
   if (o.status) p.set("status", o.status);
   if (o.q?.trim()) p.set("q", o.q.trim());
-  if (o.archived) p.set("archived", "1");
+  if (o.archived) p.set("archived", o.archived === "only" ? "only" : "1");
   return `/api/leads?${p}`;
 };
 export const detailUrl = (id: number | string) => `/api/leads/${id}`;

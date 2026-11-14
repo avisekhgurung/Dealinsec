@@ -22,7 +22,7 @@ export class DbLeadsStore implements LeadsStore {
     const q = o.q?.trim();
     const where = and(
       eq(leads.organizationId, orgId),
-      o.includeArchived ? undefined : isNull(leads.archivedAt),
+      o.archivedOnly ? isNotNull(leads.archivedAt) : o.includeArchived ? undefined : isNull(leads.archivedAt),
       o.status ? eq(leads.status, o.status) : undefined,
       q ? or(ilike(leads.companyName, `%${q.replace(/[%_\\]/g, "\\$&")}%`), ilike(leads.domain, `%${q.replace(/[%_\\]/g, "\\$&")}%`)) : undefined,
     );
@@ -136,6 +136,12 @@ export class DbLeadsStore implements LeadsStore {
   async archive(orgId: string, id: number): Promise<Lead | null> {
     const [row] = await db.update(leads).set({ archivedAt: new Date(), updatedAt: new Date() })
       .where(and(own(orgId, id), isNull(leads.archivedAt), eq(leads.converting, false))).returning();
+    return row ?? null;
+  }
+
+  async restore(orgId: string, id: number): Promise<Lead | null> {
+    const [row] = await db.update(leads).set({ archivedAt: null, updatedAt: new Date() })
+      .where(and(own(orgId, id), isNotNull(leads.archivedAt))).returning();
     return row ?? null;
   }
 

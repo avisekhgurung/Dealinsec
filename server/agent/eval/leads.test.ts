@@ -29,7 +29,7 @@ import { authorizeCall } from "../policy";
 import { AGENT_TOOLS } from "../tools";
 import { FakeProvider, call, collect, say, type Step } from "../testing";
 import type { AutonomyLevel } from "../types";
-import { convertToDeal } from "../../services/leads";
+import { archiveLead, convertToDeal, listLeads, restoreLead } from "../../services/leads";
 import { isoDateInZone } from "@shared/invoice-numbering";
 import { useWorld } from "./world-mocks";
 import { createWorld, seedLead, seedProfile, userRow, ORG2, type World } from "./world";
@@ -409,5 +409,25 @@ describe("isolation and roles", () => {
     const { provider } = await run({ steps: [call("get_lead", { leadId: lead.id }), say("ok")] });
     expect(toolResult(provider)).toMatch(/₹50,000/);
     expect(toolResult(provider)).not.toMatch(/5000000|5,000,000/);
+  });
+});
+
+describe("delete is soft: archived, listed under Deleted, restorable", () => {
+  it("a deleted lead leaves the pipeline but keeps its row, shows under Deleted, and comes back as it was", async () => {
+    const lead = seedLead(world(), { companyName: "Keep Me", status: "qualified" });
+    const gone = await archiveLead(OWNER(), lead.id);
+    expect(gone.ok && !!gone.lead.archivedAt).toBe(true);
+    const open = await listLeads(OWNER());
+    expect(open.ok && open.rows.map((r) => r.id)).toEqual([]);
+    const deleted = await listLeads(OWNER(), { archivedOnly: true });
+    expect(deleted.ok && deleted.rows.map((r) => r.companyName)).toEqual(["Keep Me"]);
+    expect(world().leads.leads).toHaveLength(1); // nothing was erased
+    const back = await restoreLead(OWNER(), lead.id);
+    expect(back.ok && back.lead.archivedAt).toBeNull();
+    expect(back.ok && back.lead.status).toBe("qualified");
+    const again = await listLeads(OWNER());
+    expect(again.ok && again.rows.map((r) => r.companyName)).toEqual(["Keep Me"]);
+    expect(await restoreLead(OWNER(), lead.id)).toMatchObject({ ok: false, code: "not_archived" });
+    expect(await restoreLead(userRow({ id: "u9", organizationId: ORG2 }) as any, lead.id)).toMatchObject({ ok: false, code: "not_found" });
   });
 });

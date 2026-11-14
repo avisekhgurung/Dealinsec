@@ -50,7 +50,7 @@ export const LOW_SCORE = 25;
 const days = (n: number) => `${n} day${n === 1 ? "" : "s"}`;
 
 export function nextAction(i: NextActionInput): NextAction {
-  if (i.archived) return { action: "none", label: "Archived", reason: "This lead is archived.", blockedBy: "archived" };
+  if (i.archived) return { action: "none", label: "Deleted", reason: "This lead is deleted. Restore it to work on it again.", blockedBy: "archived" };
   if (i.status === "won") return { action: "none", label: "Won", reason: "It became a deal. Carry on there.", blockedBy: "closed" };
   if (i.status === "lost") return { action: "none", label: "Closed", reason: "This lead is marked lost.", blockedBy: "closed" };
   if (i.doNotContact) return { action: "none", label: "Do not contact", reason: "It is marked do not contact, so nothing is sent to it.", blockedBy: "do_not_contact" };

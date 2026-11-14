@@ -122,13 +122,13 @@ export async function createLeads(user: Who, items: unknown[], opts: { source?: 
 
 /* ── read ─────────────────────────────────────────────────────────────── */
 
-export async function listLeads(user: Who, q: { status?: string; q?: string; limit?: number; offset?: number; includeArchived?: boolean } = {}): Promise<Result<{ rows: LeadRow[]; total: number; counts: Record<string, number> }>> {
+export async function listLeads(user: Who, q: { status?: string; q?: string; limit?: number; offset?: number; includeArchived?: boolean; archivedOnly?: boolean } = {}): Promise<Result<{ rows: LeadRow[]; total: number; counts: Record<string, number> }>> {
   const gate = readGate(user);
   if (gate) return gate;
   if (q.status !== undefined && !isLeadStatus(q.status)) return fail(400, "invalid", "That isn't a lead stage.");
   const orgId = user.organizationId!;
   const [{ rows, total }, counts] = await Promise.all([
-    store.list(orgId, { status: q.status as LeadStatus | undefined, q: q.q, limit: Math.min(100, Math.max(1, q.limit ?? 50)), offset: Math.max(0, q.offset ?? 0), includeArchived: q.includeArchived }),
+    store.list(orgId, { status: q.status as LeadStatus | undefined, q: q.q, limit: Math.min(100, Math.max(1, q.limit ?? 50)), offset: Math.max(0, q.offset ?? 0), includeArchived: q.includeArchived , archivedOnly: !!q.archivedOnly}),
     store.counts(orgId),
   ]);
   // A closed lead has no "next step": an old open ticket on a won or lost lead is not a thing to do.
@@ -325,6 +325,20 @@ export async function archiveLead(user: Who, id: number, opts: { actor?: Actor }
   const lead = await store.archive(orgId, id);
   if (!lead) return fail(409, "not_archivable", existing.archivedAt ? "That lead is already archived." : "That lead is being converted to a deal.");
   await store.addEvent(orgId, id, { kind: "archived", actor: opts.actor ?? "user", actorUserId: user.id });
+  return { ok: true, lead };
+}
+
+/** Undo a delete. "Delete" in the app is this archive: the row, its facts, messages and history all stay, so a
+ *  person can bring a lead back exactly as it was. */
+export async function restoreLead(user: Who, id: number, opts: { actor?: Actor } = {}): Promise<Result<{ lead: Lead }>> {
+  const gate = writeGate(user);
+  if (gate) return gate;
+  const orgId = user.organizationId!;
+  const existing = await store.get(orgId, id);
+  if (!existing) return notFound();
+  const lead = await store.restore(orgId, id);
+  if (!lead) return fail(409, "not_archived", "That lead isn't deleted.");
+  await store.addEvent(orgId, id, { kind: "restored", actor: opts.actor ?? "user", actorUserId: user.id });
   return { ok: true, lead };
 }
 

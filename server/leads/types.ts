@@ -35,6 +35,8 @@ export interface ListOptions {
   limit: number;
   offset: number;
   includeArchived?: boolean;
+  /** Only deleted (archived) leads: the "Deleted" view, where a lead can be restored. */
+  archivedOnly?: boolean;
 }
 
 export type LeadRow = Lead & { nextTicket: { id: number; title: string; dueAt: Date | null } | null };
@@ -76,6 +78,8 @@ export interface LeadsStore {
   /** Compare-and-set: moves the lead only if it is still in `from`. Null when it isn't (changed meanwhile) or doesn't exist. */
   setStatus(orgId: string, id: number, from: LeadStatus, to: LeadStatus, lostReason?: string | null): Promise<Lead | null>;
   archive(orgId: string, id: number): Promise<Lead | null>;
+  /** Undo a delete: the lead returns to the pipeline in the stage it had. Null when it isn't archived. */
+  restore(orgId: string, id: number): Promise<Lead | null>;
 
   /** `quiet`: a record that isn't a change to the lead (a message copied or opened), so the lead keeps its place in the list. */
   addEvent(orgId: string, leadId: number, e: { kind: string; data?: Record<string, unknown> | null; actor: "user" | "agent"; actorUserId?: string | null; quiet?: boolean }): Promise<void>;

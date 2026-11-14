@@ -6,7 +6,7 @@ import { REPLY_LABEL_TEXT, type ReplyLabel } from "./inbox-view";
 
 export const ACTIVITY_LABEL: Record<string, string> = {
   created: "Lead added", updated: "Details updated", status_changed: "Stage changed", note: "Note", ticket_created: "Next step added",
-  ticket_done: "Next step closed", claim_added: "Fact recorded", converted: "Turned into a deal", archived: "Archived", researched: "Researched",
+  ticket_done: "Next step closed", claim_added: "Fact recorded", converted: "Turned into a deal", archived: "Deleted", restored: "Restored", researched: "Researched",
   draft_created: "Email draft written", draft_approved: "Email approved", draft_cancelled: "Email draft stopped",
   message_sent: "Email sent", message_send_resolved: "Send outcome confirmed", message_send_late_confirmation: "Send confirmed late",
   outreach_replied: "They replied", outreach_opted_out: "They asked not to be contacted", outreach_bounced: "Email bounced",

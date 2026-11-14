@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { ChevronRight, Crosshair, FileUp, Plus, Radar, Search, Target, X } from "lucide-react";
+import { ChevronRight, Crosshair, FileUp, Plus, Radar, Search, Target, X, Trash2 } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { LoadError } from "@/components/load-error";
@@ -131,16 +131,18 @@ export default function LeadsPage() {
   const calm = useCalmMotion();
   const canEdit = memberCan(user as any, "leads.manage");
   const [status, setStatus] = useState<string>("");
+  // The Deleted view: archived leads only, where each one can be opened and restored.
+  const [deleted, setDeleted] = useState(false);
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [idealOpen, setIdealOpen] = useState(false);
   const ideal = useQuery<IdealClientResponse>({ queryKey: [IDEAL_CLIENT_URL] });
 
-  const url = listUrl({ status, q: search });
+  const url = listUrl({ status, q: search, archived: deleted ? "only" : undefined });
   const { data, isLoading, error, refetch, isFetching } = useQuery<LeadList>({ queryKey: [url] });
   // The summary always shows the whole pipeline's counts, so counts come from an unfiltered read when a filter is on.
-  const filtered = !!(status || search);
+  const filtered = !!(status || search || deleted);
   const all = useQuery<LeadList>({ queryKey: [listUrl({})], enabled: filtered });
   const counts = filtered ? all.data?.counts : data?.counts;
   const rows = data?.rows ?? [];
@@ -155,7 +157,7 @@ export default function LeadsPage() {
   const animateRows = !calm && !introDone.current;
   useEffect(() => { if (data) introDone.current = true; }, [data]);
 
-  const clear = () => { setStatus(""); setSearch(""); };
+  const clear = () => { setStatus(""); setSearch(""); setDeleted(false); };
 
   return (
     <div className="min-h-screen bg-background pb-20 lg:pb-12">
@@ -187,9 +189,15 @@ export default function LeadsPage() {
       </header>
 
       <main className="animate-fade-in space-y-4 px-4 py-5 lg:mx-auto lg:max-w-[1600px] lg:space-y-5 lg:px-8 lg:py-6">
-        {!notSetUp && !(error && !data) && (
+        {!notSetUp && !(error && !data) && (<>
           <PipelineSummary counts={counts} status={status} onStatus={setStatus} loading={!counts && (isLoading || all.isLoading)} searching={!!search.trim()} />
-        )}
+          <div className="flex items-center justify-end">
+            <button type="button" onClick={() => setDeleted((v) => !v)} aria-pressed={deleted} data-testid="leads-deleted-toggle"
+              className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium", deleted ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:bg-muted")}>
+              <Trash2 className="h-3 w-3" aria-hidden />{deleted ? "Showing deleted" : "Deleted"}
+            </button>
+          </div>
+        </>)}
 
         {!profileNotSetUp(ideal.error) && ideal.data && (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-border bg-background px-4 py-2.5 text-sm" data-testid="ideal-client-line">
@@ -227,7 +235,8 @@ export default function LeadsPage() {
                   <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted"><Search className="h-6 w-6 text-muted-foreground" aria-hidden /></div>
                   <p className="font-semibold">No leads match</p>
                   <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-                    {search.trim() && status ? <>Nothing in {stageLabel(status)} matches “{search.trim()}”.</>
+                    {deleted && !search.trim() && !status ? <>Nothing deleted. A deleted lead keeps its facts, messages and history, and can be restored from here.</>
+                      : search.trim() && status ? <>Nothing in {stageLabel(status)} matches “{search.trim()}”.</>
                       : search.trim() ? <>No company or website matches “{search.trim()}”.</>
                       : <>No leads are in {stageLabel(status)} right now.</>}
                   </p>
