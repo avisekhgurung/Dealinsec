@@ -1,7 +1,7 @@
 /** Campaigns, the pure half: the footer, what may be saved, what a refusal means, pacing, and the numbers. */
 import { describe, expect, it } from "vitest";
 import {
-  addMembersSchema, CAMPAIGN_MAX_MEMBERS, campaignCreateSchema, campaignRates, campaignUpdateSchema, countMembers, DAILY_LIMIT, draftRefusal, GAP_SECONDS, hasOptOutLine,
+  addMembersSchema, CAMPAIGN_MAX_MEMBERS, campaignCreateSchema, campaignRates, campaignUpdateSchema, countMembers, DAILY_LIMIT, draftRefusal, GAP_SECONDS, hasOptOutLine, reasonLabel,
   memberStage, memberSteps, type MemberStage, OPT_OUT_LINE, reasonLabel, stopLabel, withFooter,
 } from "./campaign";
 import { LIMITS, checkStructure } from "./outreach-check";
@@ -78,6 +78,13 @@ describe("what a refusal means", () => {
   it("drafting: an allowance stops the job, a lead that can't be written to is skipped, an outage is tried again", () => {
     for (const c of ["draft_allowance", "NO_CREDITS", "daily_limit", "global_limit", "workspace_budget"]) expect(draftRefusal(c), c).toBe("stop");
     for (const c of ["no_address", "no_facts", "do_not_contact", "suppressed", "already_contacted", "closed", "draft_rejected", "not_found", "forbidden"]) expect(draftRefusal(c), c).toBe("skip");
+    // A campaign assesses every lead against the ideal client separately, so one that is excluded or doesn't match is
+    // left behind with its reason and the rest of the campaign carries on. It never stops the run.
+    for (const c of ["fit_excluded", "fit_weak"]) {
+      expect(draftRefusal(c), c).toBe("skip");
+      expect(reasonLabel(c), c).not.toBe("Needs a look"); // it says which of the two it was, in the person's words
+    }
+    expect(reasonLabel("fit_weak")).toMatch(/doesn't match your ideal client/);
     expect(draftRefusal("model_unavailable")).toBe("retry");
     expect(draftRefusal("draft_exists")).toBe("adopt");
   });

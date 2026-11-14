@@ -42,8 +42,12 @@ export const idealClientInputSchema = z.object({
   targetIndustries: list(MAX_LIST).optional(),
   targetLocations: list(MAX_LIST).optional(),
   exclusions: list(MAX_LIST).optional(),
+  /** The company size the workspace wants, in people. Either end may be left out; both null means no size criterion. */
+  minEmployees: z.number().int().positive().max(1_000_000).nullable().optional(),
+  maxEmployees: z.number().int().positive().max(1_000_000).nullable().optional(),
   minDealMajor: z.number().positive().max(10_000_000_000).nullable().optional(),
-});
+}).refine((x) => x.minEmployees == null || x.maxEmployees == null || x.minEmployees <= x.maxEmployees,
+  { path: ["maxEmployees"], message: "The smallest company size must not be bigger than the largest." });
 export type IdealClientInput = z.infer<typeof idealClientInputSchema>;
 
 /** A profile as stored. */
@@ -53,15 +57,19 @@ export interface IdealClient {
   targetIndustries: string[];
   targetLocations: string[];
   exclusions: string[];
+  /** The company size wanted, in people; either end may be null. Judged only against a headcount the company itself states. */
+  minEmployees: number | null;
+  maxEmployees: number | null;
   minDealMinor: number | null;
   currency: string | null;
 }
 
-export const EMPTY_IDEAL_CLIENT: IdealClient = { about: null, services: [], targetIndustries: [], targetLocations: [], exclusions: [], minDealMinor: null, currency: null };
+export const EMPTY_IDEAL_CLIENT: IdealClient = { about: null, services: [], targetIndustries: [], targetLocations: [], exclusions: [], minEmployees: null, maxEmployees: null, minDealMinor: null, currency: null };
 
 /** True when there is nothing to compare a lead against. */
 export const hasCriteria = (p: IdealClient | null | undefined): boolean =>
-  !!p && (p.targetIndustries.length > 0 || p.targetLocations.length > 0 || p.exclusions.length > 0 || p.minDealMinor !== null);
+  !!p && (p.targetIndustries.length > 0 || p.targetLocations.length > 0 || p.exclusions.length > 0 || p.minDealMinor !== null
+    || p.minEmployees !== null || p.maxEmployees !== null);
 
 export interface FitLead {
   companyName: string;
@@ -70,6 +78,10 @@ export interface FitLead {
   fitSummary?: string | null;
   estValueMinor?: number | null;
   currency?: string | null;
+  /** A headcount the company states about itself ("a team of 12", "400+ employees"), from the team_size fact. */
+  employees?: string | null;
+  /** Verified facts recorded about the company, used as more of its own words (never as a number this module invents). */
+  claims?: { field: string; value: string }[];
 }
 
 export type SignalStatus = "match" | "mismatch" | "unknown";
@@ -83,6 +95,12 @@ export interface FitResult {
   excludedBy: string[];
   /** What to add to the lead to be able to say more. */
   missing: string[];
+  /**
+   * Exclusions too wordy to compare: a whole sentence ("large enterprises requiring complex enterprise procurement")
+   * can't be matched against a company's own words without guessing, so it is reported rather than silently ignored.
+   * The person can shorten it, or use the size and industry criteria, which are compared.
+   */
+  exclusionsNotCompared?: string[];
 }
 
 export const VERDICT_LABEL: Record<FitVerdict, string> = {
@@ -100,6 +118,74 @@ export function textMatches(a: string, b: string): boolean {
   if (y.length >= 3 && x.includes(y)) return true;
   const wy = new Set(words(y));
   return words(x).some((w) => wy.has(w));
+}
+
+/** A headcount from words a company uses about itself: "a team of 12", "12 people", "11-50 employees", "over 40 staff". */
+export function parseHeadcount(textValue: string | null | undefined): { min: number; max: number } | null {
+  const t = String(textValue ?? "").toLowerCase().replace(/,/g, "");
+  const range = t.match(/(\d{1,6})\s*(?:-|\u2013|\u2014|to)\s*(\d{1,6})/);
+  if (range) { const a = Number(range[1]), b = Number(range[2]); return a <= b ? { min: a, max: b } : { min: b, max: a }; }
+  const over = t.match(/(?:over|more than|\+|above)\s*(\d{1,6})|(\d{1,6})\s*\+/);
+  if (over) { const n = Number(over[1] ?? over[2]); return { min: n + 1, max: Number.MAX_SAFE_INTEGER }; }
+  const under = t.match(/(?:under|fewer than|less than|up to)\s*(\d{1,6})/);
+  if (under) return { min: 1, max: Number(under[1]) };
+  const one = t.match(/(\d{1,6})/);
+  if (one) { const n = Number(one[1]); return n > 0 ? { min: n, max: n } : null; }
+  return null;
+}
+
+/** How a size range reads back to the person who set it. */
+export function sizeWanted(min: number | null, max: number | null): string {
+  return min !== null && max !== null ? `${min}\u2013${max} people` : max !== null ? `up to ${max} people` : min !== null ? `${min}+ people` : "";
+}
+
+/**
+ * The company-size signal, from a headcount the company STATES about itself against the size the person wants. One
+ * rule for both the lead fit check and the prospect fit check (shared/icp.ts), so the two can never disagree.
+ * No stated headcount is "unknown", never a mismatch: a company that doesn't publish its size is not thereby wrong.
+ */
+export function sizeSignal(min: number | null, max: number | null, employees: string | null | undefined): FitSignal | null {
+  if (min === null && max === null) return null;
+  const want = sizeWanted(min, max);
+  const hc = parseHeadcount(employees);
+  if (!hc) return { key: "size", label: "Company size", status: "unknown", detail: `Its size isn't known yet (you want ${want}).` };
+  const lo = min ?? 1, hi = max ?? Number.MAX_SAFE_INTEGER;
+  const said = String(employees).trim().slice(0, 60);
+  return hc.max >= lo && hc.min <= hi
+    ? { key: "size", label: "Company size", status: "match", detail: `"${said}" is within ${want}.` }
+    : { key: "size", label: "Company size", status: "mismatch", detail: `"${said}" is outside ${want}.` };
+}
+
+/** The words of a phrase worth matching on: 4+ letters, so "and", "the", "for" never carry a hit. */
+const sigWords = (s: string) => Array.from(new Set(normText(s).split(" ").filter((w) => w.length >= 4)));
+/** More significant words than this and a phrase is a description, not something to match a company's words against. */
+const EXCLUSION_WORD_CAP = 4;
+
+/**
+ * Which exclusions the company's own words hit, and which were too wordy to compare.
+ *
+ * Two ways to hit, both strict enough never to invent one:
+ *   - the exclusion appears as a whole phrase, as it always has ("online gambling" must not exclude "online retail");
+ *   - OR every one of its significant words appears, so a short exclusion still fires when the words are reordered
+ *     or split up ("bulk spam email" hits "bulk email, including spam"). At least two words are required, so a single
+ *     common word can never exclude a company on its own.
+ *
+ * An exclusion with more than EXCLUSION_WORD_CAP significant words is a sentence describing a kind of client. Matching
+ * it word by word would either never fire or fire on a coincidence, so it is NOT compared and is reported instead.
+ */
+export function exclusionHits(exclusions: string[], ownWords: string): { hits: string[]; notCompared: string[] } {
+  const haystack = ` ${normText(ownWords)} `;
+  const present = new Set(haystack.trim().split(" ").filter(Boolean));
+  const hits: string[] = [], notCompared: string[] = [];
+  for (const raw of exclusions) {
+    const norm = normText(raw);
+    if (!norm) continue;
+    if (haystack.includes(` ${norm} `)) { hits.push(raw); continue; }
+    const sig = sigWords(raw);
+    if (sig.length > EXCLUSION_WORD_CAP) { notCompared.push(raw); continue; }
+    if (sig.length >= 2 && sig.every((w) => present.has(w))) hits.push(raw);
+  }
+  return { hits, notCompared };
 }
 
 function listSignal(key: "industry" | "location", label: string, targets: string[], value: string | null | undefined): FitSignal | null {
@@ -129,18 +215,24 @@ export function assessFit(profile: IdealClient | null | undefined, lead: FitLead
     else signals.push({ key: "value", label: "Value", status: "mismatch", detail: `Estimated ${money(lead.estValueMinor, lead.currency)} is below your minimum of ${money(profile.minDealMinor, profile.currency)}.` });
   }
 
-  // Exclusions are stricter than targets: a lead is only called Excluded on an exact whole-phrase hit in
-  // what it says about itself ("online gambling" must not exclude "online retail").
-  const haystack = ` ${normText([lead.companyName, lead.industry, lead.location, lead.fitSummary].filter(Boolean).join(" "))} `;
-  const excludedBy = profile.exclusions.filter((x) => normText(x) && haystack.includes(` ${normText(x)} `));
+  // Company size, from a headcount the company states about itself (the team_size fact), never a guess.
+  const employees = lead.employees?.trim() || lead.claims?.find((c) => c.field === "team_size")?.value || null;
+  const size = sizeSignal(profile.minEmployees, profile.maxEmployees, employees);
+  if (size) signals.push(size);
+
+  // Exclusions are stricter than targets, and compared only against the company's OWN words: its name, industry,
+  // place, summary and the facts recorded about it.
+  const ownWords = [lead.companyName, lead.industry, lead.location, lead.fitSummary, ...(lead.claims ?? []).map((c) => c.value)].filter(Boolean).join(" ");
+  const { hits: excludedBy, notCompared } = exclusionHits(profile.exclusions, ownWords);
 
   const missing = [
     ind?.status === "unknown" ? "an industry" : null, loc?.status === "unknown" ? "a location" : null,
+    size?.status === "unknown" ? "how many people it has" : null,
     signals.find((s) => s.key === "value" && s.status === "unknown") ? "an estimated value" : null,
   ].filter((x): x is string => !!x);
 
   const { verdict, headline } = verdictFrom(signals, excludedBy);
-  return { verdict, headline, signals, excludedBy, missing };
+  return { verdict, headline, signals, excludedBy, missing, ...(notCompared.length ? { exclusionsNotCompared: notCompared } : {}) };
 }
 
 /**

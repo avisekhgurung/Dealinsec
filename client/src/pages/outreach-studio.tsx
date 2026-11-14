@@ -158,6 +158,7 @@ export default function OutreachStudioPage() {
             leadId={id} company={lead.companyName} sender={sender} channel={channel}
             current={current} variants={variants} basis={current ? basisFor(events, current) : null}
             canEdit={writable} gap={channel === "email" ? email.data?.gap ?? null : null} hasWebsite={!!lead.website}
+            fit={channel === "email" ? email.data?.fit ?? null : null} fitStale={channel === "email" && !!email.data?.fitStale}
             allowance={allowance} pendingTo={toFor(channel)} channelOff={offFor(channel)}
             refresh={refresh} onDirtyChange={setDirty}
           />

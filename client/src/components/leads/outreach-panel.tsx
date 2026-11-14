@@ -21,6 +21,8 @@ import { useToast } from "@/hooks/use-toast";
 import { draftUrl, leadCall, leadError, messageUrl, messagesUrl, refreshLeads } from "@/lib/leads";
 import { chipText, chipTone, pendingVariants, shortcomings } from "@/lib/outreach-variants";
 import { canWriteOwn, gapNote, ownMessageProblem, type Gap } from "@/lib/first-message-gap";
+import { FitNotice } from "@/components/leads/fit-notice";
+import type { FitGate } from "@shared/draft-fit-gate";
 import { useGmailStatus } from "@/lib/gmail";
 import { DraftAllowanceLine, refreshDraftAllowance, useDraftAllowance } from "./draft-allowance-line";
 import { followUpEnds, repliesAreRead } from "@/lib/reply-reading";
@@ -59,7 +61,7 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
   const canRun = memberCan(user as any, "outreach.send");
   const gmail = useGmailCanSend(); // only offered (and mentioned) where this person can really send from Gmail
   const read = repliesAreRead(useGmailStatus().data); // the same status the line above reads: no extra request
-  const q = useQuery<{ messages: Message[]; sample?: { title: string; scope: string } | null; /** Older servers omit it. */ style?: ProfileStyleView | null; /** Older servers omit it. */ followUp?: FollowUpView | null; /** Older servers omit both. */ gap?: Gap | null; hasWebsite?: boolean }>({ queryKey: [messagesUrl(leadId)], retry: false });
+  const q = useQuery<{ messages: Message[]; sample?: { title: string; scope: string } | null; /** Older servers omit it. */ style?: ProfileStyleView | null; /** Older servers omit it. */ followUp?: FollowUpView | null; /** Older servers omit both. */ gap?: Gap | null; hasWebsite?: boolean; /** Older servers omit both. */ fit?: FitGate | null; fitStale?: boolean }>({ queryKey: [messagesUrl(leadId)], retry: false });
   const sample = q.data?.sample ?? null;
   // Offering the plan's sample commits the person's time, so it's their choice, off until they tick it.
   const [offerSample, setOfferSample] = useState(false);
@@ -68,6 +70,13 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
   const variants = pendingVariants(q.data?.messages ?? []);
   // Asked before the click: what a first message still lacks. Only said where a first message could be started at all.
   const gap = !current && !lastSent && !variants.length ? gapNote(q.data?.gap, !!q.data?.hasWebsite) : null;
+  // How this lead compares with the saved ideal client, said BEFORE the click. An excluded lead gets no button at all;
+  // one that doesn't match needs a deliberate second click, which sends confirmFit (the server ignores it for agents).
+  const fit = q.data?.fit ?? null;
+  const fitBlocks = !current && !lastSent && !variants.length && !gap && (fit?.action === "refuse" || fit?.action === "confirm_first");
+  const [fitConfirmed, setFitConfirmed] = useState(false);
+  useEffect(() => { setFitConfirmed(false); }, [leadId, fit?.verdict]);
+  const fitStops = fit?.action === "refuse" || (fit?.action === "confirm_first" && !fitConfirmed);
   const [here] = useLocation();
   // Asked only where a first message could be started; the gap comes first (it is the thing to fix).
   const allowance = useDraftAllowance(canRun && !current && !lastSent && !variants.length);
@@ -91,8 +100,8 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
     onError: (e) => { done(); fail("Couldn't save your message")(e); },
   });
   const fail = (title: string) => (e: unknown) => toast({ title, description: leadError(e), variant: "destructive" });
-  const draft = useMutation({ mutationFn: () => leadCall("POST", draftUrl(leadId), { offerSample: !!sample && offerSample }), onSuccess: drafted, onError: (e) => { void refreshDraftAllowance(); fail("Couldn't write the message")(e); } });
-  const writeVariants = useMutation({ mutationFn: () => leadCall("POST", draftUrl(leadId), { offerSample: !!sample && offerSample, variants: true }), onSuccess: drafted, onError: (e) => { void refreshDraftAllowance(); fail("Couldn't write the versions")(e); } });
+  const draft = useMutation({ mutationFn: () => leadCall("POST", draftUrl(leadId), { offerSample: !!sample && offerSample, confirmFit: fitConfirmed }), onSuccess: drafted, onError: (e) => { void refreshDraftAllowance(); fail("Couldn't write the message")(e); } });
+  const writeVariants = useMutation({ mutationFn: () => leadCall("POST", draftUrl(leadId), { offerSample: !!sample && offerSample, variants: true, confirmFit: fitConfirmed }), onSuccess: drafted, onError: (e) => { void refreshDraftAllowance(); fail("Couldn't write the versions")(e); } });
   // Choosing re-checks everything server-side (the exact text read, the lead's flag, the list); a refusal refreshes the page's picture of the batch.
   const choose = useMutation({ mutationFn: (v: Message) => leadCall("POST", messageUrl(v.id, "choose"), { bodyHash: v.bodyHash }), onSuccess: done, onError: (e) => { done(); fail("Couldn't use that version")(e); } });
   const discardAll = useMutation({ mutationFn: () => leadCall("POST", messageUrl(variants[0]!.id, "cancel"), {}), onSuccess: done, onError: (e) => { done(); fail("Couldn't discard them")(e); } });
@@ -145,6 +154,12 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
               </p>
             )}
             {current?.status === "draft" && <p className="text-sm" data-testid="outreach-draft-note">{current.byAi === false ? "Written by you. Read it once more, change anything, then approve it." : "Written by AI. Read it and change anything before you approve it."}</p>}
+            {fitBlocks && canRun && <FitNotice fit={fit!} confirmed={fitConfirmed} onConfirm={() => setFitConfirmed(true)} />}
+            {q.data?.fitStale && (current || variants.length > 0) && (
+              <p className="mt-1.5 text-sm text-amber-700 dark:text-amber-400" data-testid="outreach-fit-stale">
+                You changed your ideal client after this was written, so read it against what you want now. Nothing was rewritten or thrown away.
+              </p>
+            )}
             {current?.status === "approved" && (
               <p className="text-sm" data-testid="outreach-approved-note">
                 {gmail.ready ? "Approved. Send it from your connected Gmail, or open it in your email app, send it, then tell me here." : "Approved. Open it in your email app, send it, then tell me here."}
@@ -153,10 +168,10 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
           </div>
           {!current && !lastSent && !variants.length && canRun && !own && (
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={() => draft.mutate()} disabled={busy || !!gap || outOfDrafts} title={gap?.why ?? (outOfDrafts ? allowance?.text : undefined)} data-testid="outreach-write">
+              <Button size="sm" onClick={() => draft.mutate()} disabled={busy || !!gap || outOfDrafts || fitStops} title={gap?.why ?? fit?.message ?? (outOfDrafts ? allowance?.text : undefined)} data-testid="outreach-write">
                 {draft.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="mr-1.5 h-4 w-4" />}Write a message
               </Button>
-              <Button size="sm" variant="outline" onClick={() => writeVariants.mutate()} disabled={busy || !!gap || outOfDrafts} title={gap?.why ?? (outOfDrafts ? allowance?.text : undefined) ?? "Three versions, each opening a different way, to pick from. Counts as one AI draft."} data-testid="outreach-write-variants">
+              <Button size="sm" variant="outline" onClick={() => writeVariants.mutate()} disabled={busy || !!gap || outOfDrafts || fitStops} title={gap?.why ?? fit?.message ?? (outOfDrafts ? allowance?.text : undefined) ?? "Three versions, each opening a different way, to pick from. Counts as one AI draft."} data-testid="outreach-write-variants">
                 {writeVariants.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}3 versions
               </Button>
               <Button size="sm" variant="outline" onClick={() => setOwn(true)} disabled={busy || !canWriteOwn(q.data?.gap)} title={canWriteOwn(q.data?.gap) ? "Write the subject and the message yourself. It doesn't use an AI draft." : gap?.why} data-testid="outreach-write-own">

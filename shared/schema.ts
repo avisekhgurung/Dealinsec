@@ -1279,6 +1279,9 @@ export const clientProfiles = pgTable("client_profiles", {
   targetIndustries: jsonb("target_industries").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   targetLocations: jsonb("target_locations").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   exclusions: jsonb("exclusions").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  /** The company size wanted, in people; either end may be null (script/migrate-ideal-size.ts). */
+  minEmployees: integer("min_employees"),
+  maxEmployees: integer("max_employees"),
   /** MINOR units of `currency`, like every amount in the app. */
   minDealMinor: bigint("min_deal_minor", { mode: "number" }),
   currency: varchar("currency", { length: 3 }),

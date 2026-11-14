@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_IDEAL_CLIENT, IDEAL_ABOUT_MAX, IDEAL_ITEM_MAX, MAX_LIST, assessFit, hasCriteria, idealClientInputSchema, textMatches, tidyList, type IdealClient } from "./fit";
+import { EMPTY_IDEAL_CLIENT, IDEAL_ABOUT_MAX, IDEAL_ITEM_MAX, MAX_LIST, assessFit, exclusionHits, hasCriteria, idealClientInputSchema, sizeSignal, textMatches, tidyList, type IdealClient } from "./fit";
 
 const P = (over: Partial<IdealClient> = {}): IdealClient => ({ ...EMPTY_IDEAL_CLIENT, targetIndustries: ["logistics", "e-commerce"], targetLocations: ["India"], minDealMinor: 5_000_000, currency: "INR", ...over });
 const money = (m: number, c: string) => `${c} ${m / 100}`;
@@ -119,5 +119,85 @@ describe("the ideal client takes whatever a person types or pastes", () => {
   });
   it("still refuses what was never a length problem: a negative minimum deal", () => {
     expect(idealClientInputSchema.safeParse({ minDealMajor: -1 }).success).toBe(false);
+  });
+});
+
+describe("company size: compared only with what a company says about itself", () => {
+  const SMALL = (over: Partial<IdealClient> = {}): IdealClient => ({ ...EMPTY_IDEAL_CLIENT, minEmployees: 1, maxEmployees: 10, ...over });
+
+  it("a stated headcount inside the range matches, outside it mismatches, and none is unknown", () => {
+    const of = (employees: string | null) => assessFit(SMALL(), { companyName: "X", employees }).signals.find((x) => x.key === "size")!;
+    expect(of("a team of 8")).toMatchObject({ status: "match" });
+    expect(of("11-50 employees")).toMatchObject({ status: "mismatch" });
+    expect(of("over 400 employees")).toMatchObject({ status: "mismatch" });
+    expect(of(null)).toMatchObject({ status: "unknown" });
+    expect(of("we are a growing team")).toMatchObject({ status: "unknown" }); // words with no number say nothing
+  });
+
+  it("a range that straddles the wanted size is a match, not a mismatch: it may be either", () => {
+    expect(sizeSignal(1, 10, "5-20 people")).toMatchObject({ status: "match" });
+  });
+
+  it("the headcount comes from the team_size fact when it isn't passed directly", () => {
+    const r = assessFit(SMALL(), { companyName: "X", claims: [{ field: "team_size", value: "400+ employees" }] });
+    expect(r.signals.find((x) => x.key === "size")).toMatchObject({ status: "mismatch" });
+    expect(r.verdict).toBe("weak"); // nothing else was set to match on
+  });
+
+  it("no size set means no size signal at all, and an unknown size is listed as missing, never as a mismatch", () => {
+    expect(assessFit({ ...EMPTY_IDEAL_CLIENT, targetIndustries: ["retail"] }, { companyName: "X", employees: "4000 staff" }).signals.find((x) => x.key === "size")).toBeUndefined();
+    const r = assessFit(SMALL(), { companyName: "X" });
+    expect(r.missing).toContain("how many people it has");
+    expect(r.verdict).not.toBe("weak");
+  });
+
+  it("a size on its own is criteria enough to compare against", () => {
+    expect(hasCriteria({ ...EMPTY_IDEAL_CLIENT, maxEmployees: 10 })).toBe(true);
+    expect(hasCriteria({ ...EMPTY_IDEAL_CLIENT, minEmployees: 50 })).toBe(true);
+  });
+
+  it("the form refuses a smallest bigger than the largest, and takes either end on its own", () => {
+    expect(idealClientInputSchema.safeParse({ minEmployees: 50, maxEmployees: 10 }).success).toBe(false);
+    expect(idealClientInputSchema.safeParse({ maxEmployees: 10 }).success).toBe(true);
+    expect(idealClientInputSchema.safeParse({ minEmployees: 2 }).success).toBe(true);
+    expect(idealClientInputSchema.safeParse({ maxEmployees: 0 }).success).toBe(false);
+    expect(idealClientInputSchema.safeParse({ maxEmployees: 2.5 }).success).toBe(false);
+    expect(idealClientInputSchema.parse({ maxEmployees: null }).maxEmployees).toBeNull();
+  });
+});
+
+describe("exclusions: hit on the company's own words, never on a guess", () => {
+  it("a whole phrase hits, and a phrase inside another word does not", () => {
+    expect(exclusionHits(["online gambling"], "online gambling operator").hits).toEqual(["online gambling"]);
+    expect(exclusionHits(["online gambling"], "online retail and homeware").hits).toEqual([]);
+  });
+
+  it("a short exclusion hits when its words are reordered or split up", () => {
+    expect(exclusionHits(["bulk spam email"], "we send bulk email, including spam campaigns").hits).toEqual(["bulk spam email"]);
+  });
+
+  it("one common word is never enough on its own", () => {
+    expect(exclusionHits(["enterprise"], "we build software").hits).toEqual([]);
+    expect(exclusionHits(["students"], "we work with student unions").hits).toEqual([]); // "students" is not "student"
+  });
+
+  it("an exclusion written as a sentence is reported as not compared, never guessed at", () => {
+    const wordy = "large enterprises requiring complex enterprise procurement or custom integrations";
+    const r = exclusionHits([wordy, "gambling"], "a large marketing enterprise with 400 employees");
+    expect(r.hits).toEqual([]);
+    expect(r.notCompared).toEqual([wordy]);
+    const fit = assessFit({ ...EMPTY_IDEAL_CLIENT, exclusions: [wordy], targetIndustries: ["marketing"] }, { companyName: "Big Co", industry: "Marketing" });
+    expect(fit.verdict).not.toBe("excluded");
+    expect(fit.exclusionsNotCompared).toEqual([wordy]);
+  });
+
+  it("the facts recorded about a company are its own words too", () => {
+    const r = assessFit({ ...EMPTY_IDEAL_CLIENT, exclusions: ["tobacco"] }, { companyName: "Ridge Co", industry: "Retail", claims: [{ field: "description", value: "Distributes tobacco across three states" }] });
+    expect(r.verdict).toBe("excluded");
+    expect(r.excludedBy).toEqual(["tobacco"]);
+  });
+
+  it("nothing is reported as uncomparable when every exclusion could be compared", () => {
+    expect(assessFit({ ...EMPTY_IDEAL_CLIENT, exclusions: ["gambling"] }, { companyName: "X", industry: "Retail" }).exclusionsNotCompared).toBeUndefined();
   });
 });

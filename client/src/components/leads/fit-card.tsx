@@ -60,6 +60,11 @@ export function FitCard({ leadId }: { leadId: number }) {
           </div>
         )}
         {f.missing.length > 0 && <p className="text-xs text-muted-foreground">Add {f.missing.join(", ")} to this lead to check more.</p>}
+        {(f.exclusionsNotCompared?.length ?? 0) > 0 && (
+          <p className="text-xs text-muted-foreground" data-testid="fit-wordy-exclusions">
+            These exclusions are written as whole sentences, so they aren't compared: {f.exclusionsNotCompared!.join("; ")}. Shorten each to a few words, or use the industry and size criteria instead.
+          </p>
+        )}
         {canEdit && (
           <Button variant="outline" size="sm" onClick={() => setOpen(true)} data-testid="button-edit-ideal">{data.profileSet ? "Edit your ideal client" : "Set your ideal client"}</Button>
         )}

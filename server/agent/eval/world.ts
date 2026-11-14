@@ -205,7 +205,7 @@ export function seedLead(w: World, over: Record<string, any> = {}, orgId = ORG1)
 }
 /** An ideal-client profile for the given organization (default: the first). */
 export function seedProfile(w: World, over: Record<string, any> = {}, orgId = ORG1) {
-  const row = { organizationId: orgId, about: null, services: [], targetIndustries: [], targetLocations: [], exclusions: [], minDealMinor: null, currency: null, updatedBy: "u1", updatedAt: new Date(), ...over };
+  const row = { organizationId: orgId, about: null, services: [], targetIndustries: [], targetLocations: [], exclusions: [], minEmployees: null, maxEmployees: null, minDealMinor: null, currency: null, updatedBy: "u1", updatedAt: new Date(), ...over };
   w.profiles.set(orgId, row);
   return row;
 }

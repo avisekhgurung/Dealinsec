@@ -43,6 +43,10 @@ import { parseJsonObject } from "../agent/extraction";
 import { leadsStore } from "../leads/store";
 import { CapExceeded, CapUnavailable, GlobalCapExceeded, WorkspaceBudgetExceeded, assertWithinCap, tracedChat } from "../llm/traced";
 import { getIdealClient } from "../services/ideal-client";
+import { assessFit } from "@shared/fit";
+import { draftFitGate, fitCaution, type FitGate } from "@shared/draft-fit-gate";
+import { formatMoney } from "@shared/money";
+import { resolveLocaleSettings } from "@shared/schema";
 import { REWRITES_PER_MESSAGE, REWRITE_ACTIONS, rewriteShortfall, rewriteVersion, rewriteSystemPrompt, rewriteUserMessage, type RewriteAction } from "../outreach-studio/rewrite-prompt";
 import { relatedKnowledge } from "../services/knowledge";
 import { createTicket, fail, getLead, moveLead, readGate, updateLead, writeGate, type Result, type Who } from "../services/leads";
@@ -178,7 +182,7 @@ const asDraft = (text: string | null): { subject: string; body: string } | null 
 };
 
 /** `sample`: the proof-of-value sample the lead's opportunity plan proposed (Client Radar), which a first draft can offer. */
-export async function listMessages(user: Who, leadId: number, d: Partial<OutreachDeps> = {}): Promise<Result<{ messages: MessageView[]; sample: { title: string; scope: string } | null; /** The saved client profile whose tone and note this lead's AI drafts follow, when there is one. */ style: ProfileStyleView | null; /** What comes next after a sent message: a planned follow-up, one on hold, or a draft waiting. */ followUp: FollowUpView | null; /** What a first message still lacks (an address, or anything verified), or null when one can be written. */ gap: FirstMessageGap | null; /** Whether the lead has a website to research, which decides the advice that goes with a gap. */ hasWebsite: boolean }>> {
+export async function listMessages(user: Who, leadId: number, d: Partial<OutreachDeps> = {}): Promise<Result<{ messages: MessageView[]; sample: { title: string; scope: string } | null; /** The saved client profile whose tone and note this lead's AI drafts follow, when there is one. */ style: ProfileStyleView | null; /** What comes next after a sent message: a planned follow-up, one on hold, or a draft waiting. */ followUp: FollowUpView | null; /** What a first message still lacks (an address, or anything verified), or null when one can be written. */ gap: FirstMessageGap | null; /** Whether the lead has a website to research, which decides the advice that goes with a gap. */ hasWebsite: boolean; /** How this lead compares with the saved ideal client, and what writing to it will do (shared/draft-fit-gate.ts). */ fit: FitGate; /** A draft or approved message here was written before the ideal client was last changed, so it may need rereading. */ fitStale: boolean }>> {
   const deps = { ...defaults(), ...d };
   const gate = readGate(user);
   if (gate) return gate;
@@ -201,8 +205,23 @@ export async function listMessages(user: Who, leadId: number, d: Partial<Outreac
     v.byAi && (v.status === "variant" || v.status === "draft")
       ? { ...v, scorecard: scoreDraft(v, { greetName: lead.contactName?.trim() || null, factValues: facts.map((f) => f.value), evidenceValues: (evidenceIds.get(v.strategy ?? "") ?? []).map((id) => valueOf.get(id)!).filter(Boolean) }) }
       : v;
-  const [style, next] = await Promise.all([deps.style(user.organizationId!, leadId).catch(() => null), deps.followUp(user.organizationId!, leadId).catch(() => null)]);
-  return { ok: true, messages: rows.map((m) => withCard(messageView(m))), sample, style: profileStyleView(style), followUp: followUpView(next), gap: firstMessageGap(lead, scoreClaims), hasWebsite: !!lead.website?.trim() };
+  const [style, next, org, ideal] = await Promise.all([
+    deps.style(user.organizationId!, leadId).catch(() => null),
+    deps.followUp(user.organizationId!, leadId).catch(() => null),
+    storage.getOrganization(user.organizationId!),
+    getIdealClient(user),
+  ]);
+  // The same verdict the draft gate applies, so the page can say what will happen BEFORE the person clicks, and say
+  // afterwards what the draft was written against. Measured now; stored nowhere.
+  const locale = resolveLocaleSettings(org, user as any).locale;
+  const verifiedFacts = claims.filter((c) => c.status === "confirmed").map((c) => ({ field: c.field, value: c.value }));
+  const fit = draftFitGate(assessFit(ideal.ok ? ideal.profile : null, { ...lead, claims: verifiedFacts }, (m, c) => formatMoney(m, c, locale)));
+  // An existing draft written BEFORE the ideal client was last changed may no longer suit it. Nothing is rewritten or
+  // thrown away for that: the person is told, and decides.
+  const profileAt = ideal.ok ? ideal.updatedAt : null;
+  const pending = rows.filter((m) => m.status === "draft" || m.status === "variant" || m.status === "approved");
+  const fitStale = !!profileAt && pending.some((m) => new Date(m.createdAt).getTime() < profileAt.getTime());
+  return { ok: true, messages: rows.map((m) => withCard(messageView(m))), sample, style: profileStyleView(style), followUp: followUpView(next), gap: firstMessageGap(lead, scoreClaims), hasWebsite: !!lead.website?.trim(), fit, fitStale };
 }
 
 /** The cap refusals a draft can hit, in the person's words; null when `e` is something else. */
@@ -217,6 +236,12 @@ type DraftOpts = {
   by?: "user" | "agent"; offerSample?: boolean;
   /** The saved client profile a campaign was built for: its tone and note win over the lead's own profile. */
   profileId?: number | null;
+  /**
+   * The person has read the "doesn't match your ideal client" warning and still wants the draft. Honoured only for
+   * `by: "user"`: an AI coworker or a campaign may never wave its own warning away, so Mika reports the lead as
+   * skipped and the person decides on the lead's own page. An EXCLUDED lead is refused either way.
+   */
+  confirmFit?: boolean;
 };
 interface PreparedDraft {
   orgId: string;
@@ -236,6 +261,8 @@ interface PreparedDraft {
   researchId: number | null;
   /** The research ranked into lead items and profile context (shared/draft-evidence.ts). */
   evidence: DraftEvidence;
+  /** How the lead compares with the workspace's ideal client, and what that means for writing (shared/draft-fit-gate.ts). */
+  fit: FitGate;
 }
 
 /**
@@ -320,6 +347,17 @@ async function prepareDraft(user: Who, leadId: number, opts: DraftOpts, deps: Ou
   const { facts, angles } = draftFacts(scoreClaims);
   if (!facts.length) return fail(422, "no_facts", "There is nothing verified about this company to write from yet. Research the lead first, so the message says something true.");
 
+  // THE IDEAL-CLIENT GATE. Before any allowance, credit or model call is spent, the lead is compared with what this
+  // workspace says it wants (getIdealClient reads this organization's one row, so no other workspace's profile can
+  // reach it). The comparison uses the lead's CONFIRMED facts only — an inferred guess may not exclude a company.
+  // Refusing here rather than after the model call is the point: a lead the person excluded costs them nothing.
+  const [org, ideal] = await Promise.all([storage.getOrganization(orgId), getIdealClient(user)]);
+  const locale = resolveLocaleSettings(org, user as any).locale;
+  const verifiedFacts = claims.filter((c) => c.status === "confirmed").map((c) => ({ field: c.field, value: c.value }));
+  const fit = draftFitGate(assessFit(ideal.ok ? ideal.profile : null, { ...lead, claims: verifiedFacts }, (m, c) => formatMoney(m, c, locale)));
+  if (fit.action === "refuse") return fail(409, "fit_excluded", fit.message, { fit });
+  if (fit.action === "confirm_first" && !(opts.confirmFit && opts.by !== "agent")) return fail(409, "fit_weak", fit.message, { fit });
+
   // The plan's AI-draft allowance over 30 days: checked here so no model call is paid for a draft that couldn't be saved,
   // and again with the insert (under a per-workspace lock) so parallel requests can't pass it together.
   const tier = await outboundTier(user);
@@ -338,9 +376,7 @@ async function prepareDraft(user: Who, leadId: number, opts: DraftOpts, deps: Ou
     throw e;
   }
 
-  const [org, ideal, notes, style] = await Promise.all([
-    storage.getOrganization(orgId),
-    getIdealClient(user),
+  const [notes, style] = await Promise.all([
     relatedKnowledge(user, [lead.companyName, lead.industry, lead.location, ...facts.map((f) => f.value)].filter(Boolean).join(" "), 2),
     deps.style(orgId, leadId, opts.profileId).catch(() => null),
   ]);
@@ -359,6 +395,8 @@ async function prepareDraft(user: Who, leadId: number, opts: DraftOpts, deps: Ou
   input.sample = opts.offerSample && opts.by !== "agent" && described ? angle?.sample ?? null : null;
   // How the sender asked for messages to this kind of client to sound: wording only, every rule and check stays.
   input.style = style ? { tone: style.tone, note: style.note } : null;
+  // A partial match limits what the message may claim; it never adds a fact (shared/draft-fit-gate.ts).
+  input.caution = fitCaution(fit);
   // "What the sender offers" is the only source for what a draft says about the sender (shared/outreach-check.ts scopeIssues).
   // The profile's note is the sender's own words too, so what it says about their work is allowed, but a note alone
   // never counts as having described the offer.
@@ -386,7 +424,7 @@ async function prepareDraft(user: Who, leadId: number, opts: DraftOpts, deps: Ou
     strategies.splice(Math.max(0, strategies.findIndex((s) => s.strategy === "direct")), 0, { strategy: "value", reason: "Centres a concrete opportunity the research found.", evidenceIds: [] });
   }
   return {
-    ok: true, orgId, to, input, scope, style, ctx, model: modelFor("draft"), allowance, draftLimit, strategies,
+    ok: true, orgId, to, input, scope, style, ctx, fit, model: modelFor("draft"), allowance, draftLimit, strategies,
     claimIds: [...facts, ...angles].map((f) => f.id), claims: facts.length + angles.length, researchId: await latestResearchId(orgId, leadId), evidence,
   };
 }
@@ -398,7 +436,7 @@ const styleData = (s: DraftStyle | null) => (s ? { profileId: s.profileId, tone:
 async function writeOne(user: Who, leadId: number, p: PreparedDraft, strategy: StrategyChoice["strategy"], deps: OutreachDeps, lead: EvidenceItem | null = null): Promise<{ draft: { subject: string; body: string } | null; issues: Issue[]; retried: boolean }> {
   const trace = { task: "draft" as const, orgId: p.orgId, userId: user.id, leadId, promptVersion: versionFor(strategy) };
   const input: DraftInput = { ...p.input, lead: leadInput(lead) };
-  const messages: ChatMessage[] = [{ role: "system", content: draftSystemPrompt(strategy, p.input.style, input.lead) }, { role: "user", content: draftUserMessage(input) }];
+  const messages: ChatMessage[] = [{ role: "system", content: draftSystemPrompt(strategy, p.input.style, input.lead, input.caution) }, { role: "user", content: draftUserMessage(input) }];
   let issues: Issue[] = [], draft: { subject: string; body: string } | null = null, retried = false;
   for (let attempt = 0; attempt < 2; attempt++) {
     const reply = await deps.chat(trace, messages, { maxTokens: 2500, model: p.model });
@@ -430,7 +468,7 @@ async function storeSingle(user: Who, leadId: number, p: PreparedDraft, strategy
 }
 
 /** Writes the first message to a lead, opened the way the evidence best supports. Synchronous: one model call (and at most one retry), then the draft is stored for review. */
-export async function draftOutreach(user: Who, leadId: number, opts: DraftOpts = {}, d: Partial<OutreachDeps> = {}): Promise<Result<{ message: MessageView; retried: boolean }>> {
+export async function draftOutreach(user: Who, leadId: number, opts: DraftOpts = {}, d: Partial<OutreachDeps> = {}): Promise<Result<{ message: MessageView; retried: boolean; fit: FitGate }>> {
   const deps = { ...defaults(), ...d };
   const p = await prepareDraft(user, leadId, opts, deps);
   if (!p.ok) return p;
@@ -448,7 +486,7 @@ export async function draftOutreach(user: Who, leadId: number, opts: DraftOpts =
   }
   if (!r.draft) return fail(422, "draft_rejected", "The draft didn't pass the safety checks, so it wasn't saved. Try again, or write the message yourself.", { issues: r.issues.map((i) => i.code) });
   const stored = await storeSingle(user, leadId, p, strategy, r.draft, opts, deps, lead);
-  return stored.ok ? { ok: true, message: stored.message, retried: r.retried } : stored;
+  return stored.ok ? { ok: true, message: stored.message, retried: r.retried, fit: p.fit } : stored;
 }
 
 /**
@@ -459,7 +497,7 @@ export async function draftOutreach(user: Who, leadId: number, opts: DraftOpts =
  * so far; when only one way is grounded, or only one version survives, it is stored as the draft directly —
  * nothing to choose between. Every refusal is the same one a single draft gives.
  */
-export async function draftOutreachVariants(user: Who, leadId: number, opts: DraftOpts = {}, d: Partial<OutreachDeps> = {}): Promise<Result<{ variants: MessageView[]; retried: boolean }>> {
+export async function draftOutreachVariants(user: Who, leadId: number, opts: DraftOpts = {}, d: Partial<OutreachDeps> = {}): Promise<Result<{ variants: MessageView[]; retried: boolean; fit: FitGate }>> {
   const deps = { ...defaults(), ...d };
   const p = await prepareDraft(user, leadId, opts, deps);
   if (!p.ok) return p;
@@ -488,7 +526,7 @@ export async function draftOutreachVariants(user: Who, leadId: number, opts: Dra
 
   if (good.length === 1) {
     const stored = await storeSingle(user, leadId, p, good[0].strategy, good[0], opts, deps, good[0].lead);
-    return stored.ok ? { ok: true, variants: [stored.message], retried } : stored;
+    return stored.ok ? { ok: true, variants: [stored.message], retried, fit: p.fit } : stored;
   }
   const group = randomUUID();
   let rows: LeadMessageRow[];
@@ -507,7 +545,7 @@ export async function draftOutreachVariants(user: Who, leadId: number, opts: Dra
   // What each version was built on, by message id, for "Why Mika wrote this" (kept in the timeline entry: no new column).
   const bases = Object.fromEntries(rows.map((r) => [String(r.id), basisOf(good.find((g) => g.strategy === r.strategy)?.lead ?? null, p.evidence.profile, p.evidence.thin)]));
   await leadsStore.addEvent(p.orgId, leadId, { kind: "variants_created", data: { group, count: rows.length, strategies: good.map((g) => g.strategy), claims: p.claims, ...styleData(p.style), bases }, actor: opts.by ?? "user", actorUserId: user.id });
-  return { ok: true, variants: rows.map(messageView), retried };
+  return { ok: true, variants: rows.map(messageView), retried, fit: p.fit };
 }
 
 /**

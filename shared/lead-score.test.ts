@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessFit, type FitResult, type IdealClient } from "./fit";
+import { EMPTY_IDEAL_CLIENT, assessFit, type FitResult, type IdealClient } from "./fit";
 import { ACTIVITY_FIELDS, COMPONENTS, FIELD_FAMILIES, TOTAL_MAX, latestPerField, normField, scoreLead, type ScoreClaim } from "./lead-score";
 
 const fit = (verdict: FitResult["verdict"], headline = `fit: ${verdict}`): FitResult => ({ verdict, headline, signals: [], excludedBy: [], missing: [] });
@@ -50,7 +50,7 @@ describe("company fit comes only from the rule-based verdict", () => {
     expect(comp(scoreLead(fit(v), {}, []), "fit").points).toBe(pts);
   });
   it("uses the fit headline as the reason, and works with the real fit function", () => {
-    const profile: IdealClient = { about: null, services: [], targetIndustries: ["hotels"], targetLocations: ["Portugal"], exclusions: [], minDealMinor: null, currency: null };
+    const profile: IdealClient = { ...EMPTY_IDEAL_CLIENT, targetIndustries: ["hotels"], targetLocations: ["Portugal"] };
     const f = assessFit(profile, { companyName: "Casa Alma", industry: "Boutique hotels", location: "Lisbon, Portugal" });
     const c = comp(scoreLead(f, {}, []), "fit");
     expect(c.points).toBe(20); expect(c.reason).toBe(f.headline);

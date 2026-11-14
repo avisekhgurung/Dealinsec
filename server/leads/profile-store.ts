@@ -11,6 +11,7 @@ export const profileTableReady = tablesReadyCheck(["client_profiles"]);
 
 export interface ProfileData {
   about: string | null; services: string[]; targetIndustries: string[]; targetLocations: string[]; exclusions: string[];
+  minEmployees: number | null; maxEmployees: number | null;
   minDealMinor: number | null; currency: string | null;
 }
 export interface ProfileStore {

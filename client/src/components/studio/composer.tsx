@@ -19,6 +19,8 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import type { DraftAllowanceNote } from "@/lib/draft-allowance";
 import { gapNote, type Gap } from "@/lib/first-message-gap";
+import { FitNotice } from "@/components/leads/fit-notice";
+import type { FitGate } from "@shared/draft-fit-gate";
 import { channelDraftUrl, channelMessageUrl } from "@/lib/channels";
 import { draftUrl, leadCall, leadError, messageUrl } from "@/lib/leads";
 import { REWRITE_ACTIONS, STUDIO_KINDS, type StudioMessage } from "@/lib/studio";
@@ -37,6 +39,10 @@ export interface ComposerProps {
   /** Email only: what a first email still lacks (an address, or anything verified). */
   gap: Gap | null;
   hasWebsite: boolean;
+  /** Email only: the saved ideal client's verdict on this lead (shared/draft-fit-gate.ts), or null. */
+  fit?: FitGate | null;
+  /** Email only: a message here was written before the ideal client was last changed. */
+  fitStale?: boolean;
   allowance: DraftAllowanceNote | null;
   /** The destination typed in the right panel before a message exists (channels). */
   pendingTo: string;
@@ -117,7 +123,7 @@ export function Composer(p: ComposerProps) {
     mutationFn: (how: "ai" | "versions" | "own") => {
       if (isEmail) {
         if (how === "own") return leadCall("POST", draftUrl(p.leadId), { write: "own", subject, body });
-        return leadCall("POST", draftUrl(p.leadId), how === "versions" ? { variants: true } : {});
+        return leadCall("POST", draftUrl(p.leadId), how === "versions" ? { variants: true, confirmFit: fitConfirmed } : { confirmFit: fitConfirmed });
       }
       return leadCall("POST", channelDraftUrl(p.leadId), { channel: p.channel, kind, to: p.pendingTo.trim() || null, write: how === "own" ? "own" : "ai", ...(how === "own" ? { text: body } : {}) });
     },
@@ -158,6 +164,11 @@ export function Composer(p: ComposerProps) {
   const busy = write.isPending || save.isPending || rewrite.isPending || choose.isPending || discardVersions.isPending;
   const outOfDrafts = !!p.allowance?.out;
   const gap = isEmail ? gapNote(p.gap, p.hasWebsite) : null;
+  // The ideal-client verdict, said before a draft is spent. Email only: the short channels go through their own route.
+  const fit = isEmail ? p.fit ?? null : null;
+  const [fitConfirmed, setFitConfirmed] = useState(false);
+  useEffect(() => { setFitConfirmed(false); }, [p.leadId, fit?.verdict]);
+  const fitStops = fit?.action === "refuse" || (fit?.action === "confirm_first" && !fitConfirmed);
   const needsNumber = p.channel === "whatsapp" && !p.pendingTo.trim();
 
   /* ── versions to choose from (email) ── */
@@ -212,11 +223,14 @@ export function Composer(p: ComposerProps) {
               </div>
             )}
             {gap && <p className="text-sm" data-testid="studio-gap">{gap.why} <span className="text-muted-foreground">{gap.fix}</span></p>}
+            {!gap && fit && (fit.action === "refuse" || fit.action === "confirm_first") && (
+              <FitNotice fit={fit} confirmed={fitConfirmed} onConfirm={() => setFitConfirmed(true)} />
+            )}
             {needsNumber && <p className="text-sm text-muted-foreground">First add their WhatsApp number under "Where it goes", with the country code.</p>}
             {p.canEdit && (
               <div className="flex flex-wrap gap-2">
-                <Button onClick={() => write.mutate("ai")} disabled={busy || !!gap || outOfDrafts || needsNumber} data-testid="studio-write-ai">{write.isPending && write.variables === "ai" ? <Spin /> : <Sparkles className="mr-1.5 h-4 w-4" />}Write with Mika</Button>
-                {isEmail && <Button variant="outline" onClick={() => write.mutate("versions")} disabled={busy || !!gap || outOfDrafts} title="Three versions, each built on a different piece of research. Counts as one AI draft." data-testid="studio-write-versions">{write.isPending && write.variables === "versions" ? <Spin /> : <Sparkles className="mr-1.5 h-4 w-4" />}3 versions</Button>}
+                <Button onClick={() => write.mutate("ai")} disabled={busy || !!gap || outOfDrafts || needsNumber || fitStops} title={fitStops ? fit?.message : undefined} data-testid="studio-write-ai">{write.isPending && write.variables === "ai" ? <Spin /> : <Sparkles className="mr-1.5 h-4 w-4" />}Write with Mika</Button>
+                {isEmail && <Button variant="outline" onClick={() => write.mutate("versions")} disabled={busy || !!gap || outOfDrafts || fitStops} title={fitStops ? fit?.message : "Three versions, each built on a different piece of research. Counts as one AI draft."} data-testid="studio-write-versions">{write.isPending && write.variables === "versions" ? <Spin /> : <Sparkles className="mr-1.5 h-4 w-4" />}3 versions</Button>}
                 <Button variant="ghost" onClick={() => setOwn(true)} disabled={busy || (isEmail && p.gap === "address")} data-testid="studio-write-own"><PenLine className="mr-1.5 h-4 w-4" />Write my own</Button>
               </div>
             )}
@@ -232,6 +246,11 @@ export function Composer(p: ComposerProps) {
   return (
     <Panel channel={p.channel}>
       <div className="flex flex-wrap items-center justify-between gap-2">
+        {isEmail && p.fitStale && (
+          <p className="w-full text-sm text-amber-700 dark:text-amber-400" data-testid="studio-fit-stale">
+            You changed your ideal client after this was written. Read it against what you want now — nothing was rewritten or thrown away.
+          </p>
+        )}
         <p className="text-sm text-muted-foreground" data-testid="studio-meta">
           To {p.company} · {CHANNEL_LABEL[p.channel]} · {m ? m.kindLabel : kinds.find((k) => k.kind === kind)?.label ?? "First email"}
           {m && <> · <span className="font-medium text-foreground">{m.byAi ? (m.edited ? "Written by Mika, edited by you" : "Written by Mika") : "Written by you"}</span></>}

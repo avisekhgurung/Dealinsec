@@ -97,6 +97,8 @@ export const REASON_LABEL: Record<string, string> = {
   no_address: "No email address on the lead or its site",
   no_facts: "No verified facts to write from. Research it first",
   do_not_contact: "Marked do-not-contact",
+  fit_excluded: "You've excluded this kind of client",
+  fit_weak: "It doesn't match your ideal client. Draft it on the lead itself if you still want to write",
   suppressed: "On your do-not-contact list",
   already_contacted: "Already contacted",
   closed: "The lead is closed",

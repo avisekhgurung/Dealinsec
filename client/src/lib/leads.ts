@@ -76,7 +76,7 @@ export interface FollowUpView { id: number; title: string; kind: string; due: st
 export interface FollowUps { today: string; overdue: FollowUpView[]; dueToday: FollowUpView[]; upcoming: FollowUpView[] }
 export const FOLLOWUPS_URL = "/api/leads/follow-ups";
 
-export interface IdealClientView { about: string | null; services: string[]; targetIndustries: string[]; targetLocations: string[]; exclusions: string[]; minDealMinor: number | null; currency: string | null }
+export interface IdealClientView { about: string | null; services: string[]; targetIndustries: string[]; targetLocations: string[]; exclusions: string[]; minEmployees: number | null; maxEmployees: number | null; minDealMinor: number | null; currency: string | null }
 export interface IdealClientResponse { profile: IdealClientView; isSet: boolean }
 export const IDEAL_CLIENT_URL = "/api/ideal-client";
 export const fitUrl = (id: number | string) => `/api/leads/${id}/fit`;
@@ -88,7 +88,7 @@ export const draftUrl = (leadId: number | string) => `/api/sales/leads/${leadId}
 export const messageUrl = (id: number | string, action = "") => `/api/sales/messages/${id}${action ? `/${action}` : ""}`;
 export const OUTREACH_QUEUE_URL = "/api/sales/outreach";
 export const SUPPRESSIONS_URL = "/api/sales/suppressions";
-export const hasCriteria = (p: IdealClientView | undefined) => !!p && (p.targetIndustries.length > 0 || p.targetLocations.length > 0 || p.exclusions.length > 0 || p.minDealMinor !== null);
+export const hasCriteria = (p: IdealClientView | undefined) => !!p && (p.targetIndustries.length > 0 || p.targetLocations.length > 0 || p.exclusions.length > 0 || p.minDealMinor !== null || p.minEmployees !== null || p.maxEmployees !== null);
 /** Anything under /api/ideal-client or a lead's fit changes when the profile does. */
 export const refreshProfile = () =>
   queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && ((q.queryKey[0] as string).startsWith(IDEAL_CLIENT_URL) || (q.queryKey[0] as string).endsWith("/fit")) });

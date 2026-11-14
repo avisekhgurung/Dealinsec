@@ -4,6 +4,7 @@
  * /api/sales/leads/:id/messages and the others from /api/channels/leads/:id/messages; nothing here invents a state:
  * "sent" is either "sent from your Gmail" (DealInSec did it) or "you marked it sent" (the person told us).
  */
+import type { FitGate } from "@shared/draft-fit-gate";
 import { CHANNELS, CHANNEL_LABEL, externalUrl, normalPhone, type Channel, type ShortChannel } from "@shared/channels";
 import type { SocialLinks } from "@shared/social-links";
 import type { DraftBasis, DraftEvidence } from "@shared/draft-evidence";
@@ -49,7 +50,7 @@ export interface EmailMessage {
   to: string | null; toSource: "lead" | "site" | null; edited: boolean; createdBy: string; createdAt: string; approvedAt: string | null; sentAt: string | null;
   strategy?: string | null; variantGroup?: string | null; byAi?: boolean;
 }
-export interface EmailMessages { messages: EmailMessage[]; gap?: "address" | "facts" | null; hasWebsite?: boolean }
+export interface EmailMessages { messages: EmailMessage[]; gap?: "address" | "facts" | null; hasWebsite?: boolean; /** The saved ideal client's verdict on this lead, and what writing to it will do. Older servers omit both. */ fit?: FitGate | null; fitStale?: boolean }
 
 /** One message in the Studio, whichever channel it is on. */
 export interface StudioMessage {

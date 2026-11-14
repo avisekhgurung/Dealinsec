@@ -19,13 +19,17 @@ export function IdealClientDialog({ open, onOpenChange }: { open: boolean; onOpe
   const { toast } = useToast();
   const { input } = useMoney();
   const { data } = useQuery<IdealClientResponse>({ queryKey: [IDEAL_CLIENT_URL], enabled: open });
-  const [f, setF] = useState({ about: "", services: "", targetIndustries: "", targetLocations: "", exclusions: "", minDeal: "" });
+  const [f, setF] = useState({ about: "", services: "", targetIndustries: "", targetLocations: "", exclusions: "", minDeal: "", minEmployees: "", maxEmployees: "" });
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !data) return;
     const p = data.profile;
-    setF({ about: p.about ?? "", services: join(p.services), targetIndustries: join(p.targetIndustries), targetLocations: join(p.targetLocations), exclusions: join(p.exclusions), minDeal: p.minDealMinor ? input(p.minDealMinor) : "" });
+    setF({
+      about: p.about ?? "", services: join(p.services), targetIndustries: join(p.targetIndustries), targetLocations: join(p.targetLocations),
+      exclusions: join(p.exclusions), minDeal: p.minDealMinor ? input(p.minDealMinor) : "",
+      minEmployees: p.minEmployees ? String(p.minEmployees) : "", maxEmployees: p.maxEmployees ? String(p.maxEmployees) : "",
+    });
     setError(null);
   }, [open, data]);
 
@@ -33,9 +37,20 @@ export function IdealClientDialog({ open, onOpenChange }: { open: boolean; onOpe
     mutationFn: () => {
       const minDeal = f.minDeal.trim() ? Number(f.minDeal.replace(/,/g, "")) : null;
       if (minDeal !== null && !(minDeal > 0)) throw new Error("400: " + JSON.stringify({ error: "Minimum deal must be a positive number." }));
+      const people = (v: string, which: string) => {
+        if (!v.trim()) return null;
+        const n = Number(v.replace(/[,\s]/g, ""));
+        if (!Number.isInteger(n) || n <= 0) throw new Error("400: " + JSON.stringify({ error: `The ${which} company size must be a whole number of people.` }));
+        return n;
+      };
+      const minEmployees = people(f.minEmployees, "smallest"), maxEmployees = people(f.maxEmployees, "largest");
+      if (minEmployees !== null && maxEmployees !== null && minEmployees > maxEmployees) {
+        throw new Error("400: " + JSON.stringify({ error: "The smallest company size must not be bigger than the largest." }));
+      }
       return leadCall("PUT", IDEAL_CLIENT_URL, {
         about: f.about.trim(), services: split(f.services), targetIndustries: split(f.targetIndustries),
         targetLocations: split(f.targetLocations), exclusions: split(f.exclusions), minDealMajor: minDeal,
+        minEmployees, maxEmployees,
       });
     },
     onSuccess: () => { refreshProfile(); toast({ title: "Ideal client saved" }); onOpenChange(false); },
@@ -47,10 +62,11 @@ export function IdealClientDialog({ open, onOpenChange }: { open: boolean; onOpe
   });
 
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((p) => ({ ...p, [k]: e.target.value }));
+  const ONE_LINE = new Set(["minDeal", "minEmployees", "maxEmployees"]);
   const field = (k: Exclude<keyof typeof f, "about">, label: string, hint: string, props: Record<string, unknown> = {}) => (
     <div className="space-y-1.5">
       <Label htmlFor={`ic-${k}`} className="text-xs">{label}</Label>
-      {k === "minDeal"
+      {ONE_LINE.has(k)
         ? <Input id={`ic-${k}`} value={f[k]} onChange={set(k)} placeholder={hint} data-testid={`input-ic-${k}`} {...props} />
         // A box that keeps line breaks: a pasted column of items stays a column, instead of becoming one long line.
         : <Textarea id={`ic-${k}`} rows={2} value={f[k]} onChange={set(k)} placeholder={hint} data-testid={`input-ic-${k}`} {...props} />}
@@ -72,6 +88,16 @@ export function IdealClientDialog({ open, onOpenChange }: { open: boolean; onOpe
           {field("services", "What you sell", "Website design, Branding")}
           {field("targetIndustries", "Industries you want", "Logistics, Retail")}
           {field("targetLocations", "Where", "India, UK")}
+          <div className="space-y-1.5">
+            <Label className="text-xs">How big a company you want</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {field("minEmployees", "Smallest, in people", "1", { inputMode: "numeric" })}
+              {field("maxEmployees", "Largest, in people", "10", { inputMode: "numeric" })}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Compared only with a headcount a company states about itself. One it doesn't publish stays unknown, never a mismatch.
+            </p>
+          </div>
           {field("minDeal", "Smallest deal worth taking", "50000", { inputMode: "decimal" })}
           {field("exclusions", "Never work with", "Gambling, Tobacco")}
           <p className="text-[11px] text-muted-foreground">Separate items with commas, or put each on its own line. Paste as much as you like; nothing is too long. Leave a field blank to leave it out.</p>

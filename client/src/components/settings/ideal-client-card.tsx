@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IdealClientDialog } from "@/components/leads/ideal-client-dialog";
 import { useMoney } from "@/hooks/use-locale";
 import { IDEAL_CLIENT_URL, type IdealClientResponse } from "@/lib/leads";
+import { sizeWanted } from "@shared/fit";
 
 export function IdealClientCard({ canEdit }: { canEdit: boolean }) {
   const [open, setOpen] = useState(false);
@@ -26,6 +27,7 @@ export function IdealClientCard({ canEdit }: { canEdit: boolean }) {
     { label: "Industries you target", value: p.targetIndustries.join(", ") },
     { label: "Places you target", value: p.targetLocations.join(", ") },
     { label: "Never work with", value: p.exclusions.join(", ") },
+    { label: "How big a company", value: sizeWanted(p.minEmployees, p.maxEmployees) },
     { label: "Smallest deal worth taking", value: p.minDealMinor ? money(p.minDealMinor) : "" },
   ].filter((r) => r.value) : [];
   return (
@@ -37,6 +39,7 @@ export function IdealClientCard({ canEdit }: { canEdit: boolean }) {
         <p className="text-sm text-muted-foreground">
           One saved profile drives the rest: the fit check on every lead, Client Radar's "Use my saved ideal client",
           and what an AI-written message may say you offer — a draft never claims a service you haven't written here.
+          A lead you've excluded is never written to, and one that doesn't match asks you first.
         </p>
         {q.data && (rows.length ? (
           <dl className="space-y-1.5" data-testid="ideal-client-summary">

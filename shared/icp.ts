@@ -6,7 +6,9 @@
  */
 import { z } from "zod";
 import { sanitizeQuery } from "./discovery";
-import { assessFit, normText, textMatches, verdictFrom, type FitResult, type FitSignal, type IdealClient } from "./fit";
+import { EMPTY_IDEAL_CLIENT, assessFit, normText, parseHeadcount, sizeSignal, textMatches, verdictFrom, type FitResult, type FitSignal, type IdealClient } from "./fit";
+/** Re-exported: the headcount parser lives with the fit rules it feeds (shared/fit.ts), so both fit checks read a size the same way. */
+export { parseHeadcount };
 import { SEGMENTS, opportunityPhrasings } from "./opportunity-queries";
 import { bigCompanyIn, classifyHiring, knownBigApplies, outsideHelpIn } from "./opportunity-signals";
 import { REQUIREMENT_KEYS, WANTED_SIGNALS } from "./profile-keys";
@@ -329,20 +331,6 @@ function pickSearches(t: string[], extra: string[], max: number): string[] {
 
 /* ── judging a company against the ICP ─────────────────────────────────── */
 
-/** A headcount from words a page uses: "a team of 12", "12 people", "11-50 employees", "over 40 staff". */
-export function parseHeadcount(textValue: string | null | undefined): { min: number; max: number } | null {
-  const t = String(textValue ?? "").toLowerCase().replace(/,/g, "");
-  const range = t.match(/(\d{1,6})\s*(?:-|–|—|to)\s*(\d{1,6})/);
-  if (range) { const a = Number(range[1]), b = Number(range[2]); return a <= b ? { min: a, max: b } : { min: b, max: a }; }
-  const over = t.match(/(?:over|more than|\+|above)\s*(\d{1,6})|(\d{1,6})\s*\+/);
-  if (over) { const n = Number(over[1] ?? over[2]); return { min: n + 1, max: Number.MAX_SAFE_INTEGER }; }
-  const under = t.match(/(?:under|fewer than|less than|up to)\s*(\d{1,6})/);
-  if (under) return { min: 1, max: Number(under[1]) };
-  const one = t.match(/(\d{1,6})/);
-  if (one) { const n = Number(one[1]); return n > 0 ? { min: n, max: n } : null; }
-  return null;
-}
-
 export interface ProspectProfile {
   name: string;
   /** The company's registrable domain: its country-code ending (.uk, .de) is evidence of where it is, when the page doesn't say. */
@@ -399,10 +387,11 @@ export interface FitFindingLike { kind: string; type: string; value: string; sta
  */
 export function prospectFit(icp: Icp, p: ProspectProfile, extras: { findings?: FitFindingLike[] } = {}): FitResult {
   const ideal: IdealClient = {
-    about: null, services: [], minDealMinor: null, currency: null,
+    ...EMPTY_IDEAL_CLIENT,
     targetIndustries: [icp.industry, ...icp.keywords],
     targetLocations: [], // judged below: a country code is compared as a code, a city is never a mismatch for a country
     exclusions: icp.exclusions,
+    // Size is judged below from the ICP's own employee range, against what the company states.
   };
   // WHAT KIND of company it is comes from the field that says so; only without one, from its own description.
   const industryText = p.industry?.trim() || [p.description, p.services].filter(Boolean).join(" · ") || null;
@@ -426,14 +415,8 @@ export function prospectFit(icp: Icp, p: ProspectProfile, extras: { findings?: F
     else signals.push({ key: "location", label: "Location", status: "unknown", detail: placeText ? `It says ${placeText}; the country isn't stated, so it isn't compared with ${want}.` : "Where it is based isn't known yet." });
   }
 
-  if (icp.employeeMin !== null || icp.employeeMax !== null) {
-    const hc = parseHeadcount(p.employees);
-    const lo = icp.employeeMin ?? 1, hi = icp.employeeMax ?? Number.MAX_SAFE_INTEGER;
-    const want = icp.employeeMin && icp.employeeMax ? `${lo}–${hi}` : icp.employeeMax ? `up to ${hi}` : `${lo}+`;
-    if (!hc) signals.push({ key: "size", label: "Company size", status: "unknown", detail: `Its size isn't known yet (you want ${want} people).` });
-    else if (hc.max >= lo && hc.min <= hi) signals.push({ key: "size", label: "Company size", status: "match", detail: `"${p.employees}" is within ${want} people.` });
-    else signals.push({ key: "size", label: "Company size", status: "mismatch", detail: `"${p.employees}" is outside ${want} people.` });
-  }
+  const size = sizeSignal(icp.employeeMin, icp.employeeMax, p.employees);
+  if (size) signals.push(size);
   if (icp.targetMarket.length) {
     const said = [p.targetCustomers, p.description, p.services].filter(Boolean).join(" ");
     const hit = said ? icp.targetMarket.find((m) => textMatches(m, said)) : undefined;
