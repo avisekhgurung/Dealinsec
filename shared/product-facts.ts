@@ -12,6 +12,7 @@
  * - No dates for unbuilt things ("coming soon", "next month"): say what is true today.
  */
 import { GLOBAL_PLANS } from "./globalPlans";
+import { MAX_QUANTITY as LIST_MAX_COMPANIES } from "./icp";
 import { PRO_INCLUDED_SEATS } from "./permissions";
 import { OUTBOUND_ALLOWANCE_DEFAULTS, OUTBOUND_WINDOW_DAYS } from "./outbound-plans";
 import { LEAGUE_ALLOWANCE_DEFAULTS as LG, LEAGUE_LIMITS, LEAGUE_WINDOW_DAYS } from "./ai-league";
@@ -154,8 +155,8 @@ export const PRICING = {
 } as const;
 
 export const PRICING_LINES: readonly string[] = [
-  `Free plan: the work you have already won costs nothing — deals, quotations, agreements signed online, invoices and payment tracking, with no monthly cap on any of them — plus the leads pipeline, ${OB.free.monthlySearches} Client Radar searches a month (up to ${OB.free.maxCompanies} companies each) and ${OB.free.monthlyDrafts} AI outreach drafts a month. Permanent, no card.`,
-  `DealInSec Pro: more of the AI that finds clients — Client Radar with ${OB.pro.monthlySearches} searches a month (up to ${OB.pro.maxCompanies} companies each), ${OB.pro.monthlyDrafts} AI outreach drafts a month, and ${PRO_INCLUDED_SEATS} team members. ${rupees(PRICING.proMonthlyInr)} a month in India, paid once a month: it does not renew or charge automatically, you pay again to extend. The deal-to-invoice flow is free on every plan, so Pro buys research and drafting capacity, not a different product. There is no separate plan for Client Radar or the CRM, and no annual plan. Extra team members are ${rupees(PRICING.extraSeatInr)} each a month.`,
+  `Free plan: the work you have already won costs nothing — deals, quotations, agreements signed online, invoices and payment tracking, with no monthly cap on any of them — plus the leads pipeline, ${OB.free.monthlySearches} Client Radar deep searches a month (up to ${OB.free.maxCompanies} companies each), ${OB.free.monthlyLists} bulk lists (up to ${LIST_MAX_COMPANIES} checked companies each, not researched), ${OB.free.monthlySocialScans} Social Intent scans, ${OB.free.monthlyProspects} companies researched in depth, ${OB.free.monthlyDrafts} AI outreach drafts and ${LG.free.monthlyRuns} AI coworker tasks a month. Permanent, no card.`,
+  `DealInSec Pro: more of the AI that finds clients — Client Radar with ${OB.pro.monthlySearches} deep searches a month (up to ${OB.pro.maxCompanies} companies each), ${OB.pro.monthlyLists} bulk lists, ${OB.pro.monthlySocialScans} Social Intent scans, ${OB.pro.monthlyProspects} companies researched in depth, ${OB.pro.monthlyDrafts} AI outreach drafts and ${LG.pro.monthlyRuns} AI coworker tasks a month, and ${PRO_INCLUDED_SEATS} team members. ${rupees(PRICING.proMonthlyInr)} a month in India, paid once a month: it does not renew or charge automatically, you pay again to extend. The deal-to-invoice flow is free on every plan, so Pro buys research and drafting capacity, not a different product. There is no separate plan for Client Radar or the CRM, and no annual plan. Extra team members are ${rupees(PRICING.extraSeatInr)} each a month.`,
   "Booster packs: one-time credit packs for extra Client Radar searches or extra AI outreach drafts, for when a plan's allowance is used up before it frees up. They are bought in the app under Credits & usage (the prices, pack sizes and validity are listed there), never renew, are spent only after the plan's own allowance, and stay yours if the plan ends. They add capacity to the same features; they do not unlock anything else.",
   PRICING.checkout,
   `Checkout charges exactly the listed price (${rupees(PRICING.proMonthlyInr)} for Pro); DealInSec adds no tax on top of it.`,

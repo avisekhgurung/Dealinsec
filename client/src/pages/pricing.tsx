@@ -30,6 +30,7 @@ import { useRazorpayCheckout, type CheckoutPlan } from "@/hooks/use-razorpay-che
 import { PLAN_PRICE_DEFAULTS, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
 import { OUTBOUND_ALLOWANCE_DEFAULTS, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
 import { TopUpPacks } from "@/components/credits/top-up";
+import { CreditSpendExplainer, PlanAllowanceTable } from "@/components/pricing/allowance-table";
 import { Zap } from "lucide-react";
 import { useLocale } from "@/hooks/use-locale";
 import { trackEvent } from "@/lib/analytics";
@@ -469,6 +470,10 @@ export default function PricingPage() {
             </div>
           </div>
         </Card>
+
+        {/* ── The full allowance table and what-spends-what, matching the numbers the server enforces ── */}
+        <PlanAllowanceTable />
+        <CreditSpendExplainer />
 
         {/* ── How the free plan works ── */}
         <div className="glass-card rounded-2xl border-0 p-5 space-y-3">

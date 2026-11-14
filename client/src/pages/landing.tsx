@@ -64,6 +64,7 @@ import { openConsentSettings } from "@/lib/consent";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { BRAND_GRADIENT, GradientText, SectionHeader, fadeUp, onSectionLinkClick, scrollToSection, stagger } from "@/components/landing-shared";
 import { LandingTryDemo } from "@/components/landing-try-demo";
+import { CreditSpendExplainer, PlanAllowanceTable } from "@/components/pricing/allowance-table";
 import { AiTeamSection, AudienceCards, CtaBanner, DealSuiteSection, FaqSection, FeaturesSection, HeroSection, ManualWorkflowSection, WhatIsSection, WorkflowWalkthrough } from "@/components/landing-redesign";
 import { useQuery } from "@tanstack/react-query";
 import { PACKS_URL } from "@/lib/credit-keys";
@@ -935,6 +936,17 @@ function PricingPreview({ isAuthenticated, onCTA }: { isAuthenticated: boolean; 
               <li key={t} className="flex items-start gap-2"><Check className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" /><span>{t}</span></li>
             ))}
           </ul>
+        </motion.div>
+
+        {/* The full allowance table and what-spends-what, so nobody has to reverse-engineer the metering. */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mt-5 max-w-4xl mx-auto space-y-5"
+        >
+          <PlanAllowanceTable />
+          <CreditSpendExplainer />
         </motion.div>
       </div>
     </section>

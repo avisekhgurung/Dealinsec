@@ -12,7 +12,7 @@ import { PRICING } from "@shared/product-facts";
 import { OUTBOUND_ALLOWANCE_DEFAULTS } from "@shared/outbound-plans";
 
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8");
-const FILES = ["client/src/components/landing-redesign.tsx", "client/src/components/landing-try-demo.tsx", "client/src/pages/landing.tsx"];
+const FILES = ["client/src/components/landing-redesign.tsx", "client/src/components/landing-try-demo.tsx", "client/src/pages/landing.tsx", "client/src/components/pricing/allowance-table.tsx"];
 const src = Object.fromEntries(FILES.map((f) => [f, read(f)]));
 const all = Object.values(src).join("\n");
 const sections = src["client/src/components/landing-redesign.tsx"];
