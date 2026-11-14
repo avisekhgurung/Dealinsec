@@ -107,6 +107,29 @@ export const KIND_DRAFT_TARGET: Record<MessageKind, { min: number; max: number }
 };
 export const maxFor = (kind: MessageKind, premium = false) => (kind === "connection_note" && premium ? LINKEDIN_NOTE_PREMIUM_MAX : KIND_MAX[kind]);
 
+/**
+ * The longest a MODEL-written draft may be, and the shortest: the kind's own draft target, except that a LinkedIn
+ * connection note follows the channel's real ceiling, which is higher on a Premium account.
+ */
+export function draftRange(kind: MessageKind, premium = false): { min: number; max: number } {
+  const t = KIND_DRAFT_TARGET[kind];
+  return { min: t.min, max: kind === "connection_note" ? maxFor(kind, premium) : t.max };
+}
+
+/**
+ * The length to ASK a model for, which is deliberately shorter than what will be accepted.
+ *
+ * A model cannot count characters, so it lands near whatever number it is given, a little over as often as under.
+ * The LinkedIn connection note is the one kind whose accepted length IS the channel's hard ceiling (200 characters,
+ * 300 on Premium), so asking for "up to 200" produced 210-odd, twice, and the person got a refusal instead of a note
+ * (seen on production, 14 Nov 2026: POST /api/channels/leads/:id/draft 422 body_length, twice in 12 seconds). Asking
+ * for a fifth less leaves room for the overshoot, and anything up to the real ceiling is still accepted.
+ */
+export function draftAim(kind: MessageKind, premium = false): { min: number; max: number } {
+  const { min, max } = draftRange(kind, premium);
+  return { min, max: Math.max(min + 20, Math.round(max * 0.8)) };
+}
+
 /* ── message states ──────────────────────────────────────────────────────── */
 
 /** draft → approved → (sending →) sent, or cancelled; an API send can end failed or uncertain. */
@@ -192,6 +215,30 @@ export function externalUrl(channel: ShortChannel, to: string | null, search?: s
   return null;
 }
 
+/**
+ * The account's own PUBLIC page, for the channels whose message link only works for someone already signed in.
+ *
+ * `ig.me/m/<handle>` and `m.me/<page>` are real Meta links and they do resolve, but signed out they land on an
+ * Instagram or Messenger login page with no explanation, which reads exactly like a broken link (reported 14 Nov
+ * 2026). The profile page opens for anyone, so it is offered beside the message link: from there the person presses
+ * Message themselves, which is what they do on these channels anyway.
+ *
+ * Only Instagram and Messenger need this. A LinkedIn destination is already the person's profile URL, and X's is
+ * their profile too.
+ */
+export function profileUrl(channel: ShortChannel, to: string | null): string | null {
+  if (!to) return null;
+  if (channel === "instagram") return `https://www.instagram.com/${encodeURIComponent(to)}/`;
+  if (channel === "messenger") return `https://www.facebook.com/${encodeURIComponent(to)}`;
+  return null;
+}
+
+/** Whether this channel's message link needs the person to be signed in to that app in the same browser. */
+export const SIGN_IN_NEEDED: Partial<Record<ShortChannel, string>> = {
+  instagram: "This opens their Instagram messages, which needs you signed in to Instagram in this browser. If it shows a login page, open their profile instead and press Message there.",
+  messenger: "This opens Messenger, which needs you signed in to Facebook in this browser. If it shows a login page, open their Page instead and press Message there.",
+};
+
 /* ── draft checks ────────────────────────────────────────────────────────── */
 
 const PLACEHOLDER = /\[[^\]\n]{1,40}\]|\{\{[^}\n]*\}\}|\{[A-Za-z_ ]{2,30}\}|\b(?:INSERT|TODO|LOREM|XXX|FIRSTNAME|YOUR NAME)\b/;
@@ -208,10 +255,10 @@ export function checkChannelText(text: string, kind: MessageKind, opts: { premiu
 }
 
 /** The extra rules for a MODEL-written draft: the same content rules as email (no price, invented link, false history…) plus the draft length. */
-export function checkChannelDraft(text: string, kind: MessageKind, ctx: { siteHost: string }): Issue[] {
-  const t = text.trim(), target = KIND_DRAFT_TARGET[kind];
-  const out = checkChannelText(t, kind);
-  if (!out.length && (t.length < target.min || t.length > target.max)) out.push({ code: "body_length", message: `Write ${target.min} to ${target.max} characters (it is ${t.length}).` });
+export function checkChannelDraft(text: string, kind: MessageKind, ctx: { siteHost: string; premium?: boolean }): Issue[] {
+  const t = text.trim(), range = draftRange(kind, ctx.premium);
+  const out = checkChannelText(t, kind, { premium: ctx.premium });
+  if (!out.length && (t.length < range.min || t.length > range.max)) out.push({ code: "body_length", message: `Write ${range.min} to ${range.max} characters (it is ${t.length}).` });
   return [...out, ...contentIssues(t.slice(0, 2000), { to: "", siteHost: ctx.siteHost })];
 }
 

@@ -7,10 +7,10 @@
  * sender who hasn't described their offer) are the email draft's, checked by shared/outreach-check.ts scopeIssues.
  */
 import { fenceUntrusted } from "../agent/untrusted";
-import { KIND_DRAFT_TARGET, type MessageKind, type ShortChannel } from "@shared/channels";
+import { draftAim, type MessageKind, type ShortChannel } from "@shared/channels";
 import { leadBlock, leadRule, noteBlock, noteRule, toneBlock, type DraftInput, type DraftStyleInput } from "../sales/outreach-prompt";
 
-export const CHANNEL_PROMPT_VERSION = "draft-ch5";
+export const CHANNEL_PROMPT_VERSION = "draft-ch6";
 
 const clean = (s: string, n: number) => s.replace(/[\u0000-\u001f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
 
@@ -24,8 +24,10 @@ const WHAT: Record<string, string> = {
   "messenger:fb_message": "a first Facebook Messenger message from the sender to a business's Facebook Page. The business has not written to the sender. Friendly and brief, one or two short paragraphs.",
 };
 
-export function channelSystemPrompt(channel: ShortChannel, kind: MessageKind, style?: DraftStyleInput | null, lead?: DraftInput["lead"]): string {
-  const t = KIND_DRAFT_TARGET[kind];
+export function channelSystemPrompt(channel: ShortChannel, kind: MessageKind, style?: DraftStyleInput | null, lead?: DraftInput["lead"], premium = false): string {
+  // What to ASK for, which is shorter than what is accepted, because a model lands near the number it is given and a
+  // connection note's accepted length is LinkedIn's own ceiling (shared/channels.ts draftAim).
+  const t = draftAim(kind, premium);
   return `You write ${WHAT[`${channel}:${kind}`] ?? "a short first message"} You have no tools and take no actions. A person reads and edits your draft before anything is sent, and sends it themselves.
 ${toneBlock(style, "short")}
 Rules:
@@ -35,8 +37,9 @@ Rules:
 - Never mention a price, rate, discount, percentage, guarantee or deadline. Never promise a result.
 - No links, web addresses, email addresses, phone numbers, hashtags or emojis. No placeholders such as [Name]: if you have no name to greet, use none.
 - This is a first contact. Do not suggest you have spoken or met before.
-- Plain text only. Between ${t.min} and ${t.max} characters in total, counting spaces.
-- One clear, low-pressure ask.${leadRule(lead).replace("in the first two sentences", "in the first sentence")}
+- Plain text only. Aim for ${t.min} to ${t.max} characters in total, counting spaces. Shorter is better than longer; never go past ${t.max + 20}.
+- One clear, low-pressure ask.${leadRule(lead).replace("in the first two sentences", "in the first sentence")}${kind === "connection_note" ? `
+- There is very little room here. One short sentence on why the sender wants to connect, then the ask. Mentioning a fact is OPTIONAL: leave it out rather than run long, and never squeeze in two.` : ""}
 - Never offer to make, prepare, put together or send anything (no sample, mock-up or prototype): the sender hasn't offered that. Ask a question instead.
 - Describe the sender only in the words of "What the sender offers": never add another service, years of experience, credentials, awards, client counts or results. If it says the sender has not described their offer, say nothing about who the sender is or what they do, and suggest no service: ask one question about the company instead.${noteRule(style)}
 

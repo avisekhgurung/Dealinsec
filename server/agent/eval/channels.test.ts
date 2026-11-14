@@ -43,6 +43,7 @@ import { decryptToken, loadKeyring } from "../../mail/token-crypto";
 import { leadsStore } from "../../leads/store";
 import { useWorld } from "./world-mocks";
 import { createWorld, seedLead, seedProfile, userRow, ORG1, ORG2, type World } from "./world";
+import { CHANNEL_PROMPT_VERSION } from "../../channels/prompt";
 
 const world = () => (globalThis as any).__world as World;
 const OWNER = () => userRow() as any;
@@ -513,7 +514,7 @@ describe("AI drafts on every channel: the sender is described only as their offe
       const r = await aiDraft(channel, kind, [say(middle)]);
       if (want === "ok") {
         expect(r).toMatchObject({ ok: true, retried: false, message: { body: say(middle), status: "draft" } });
-        expect(mem.messages.at(-1)!.promptVersion).toBe("draft-ch5");
+        expect(mem.messages.at(-1)!.promptVersion).toBe(CHANNEL_PROMPT_VERSION); // whatever it is, the draft counts against the AI-draft allowance
         expect(prompts).toHaveLength(1);
         return;
       }

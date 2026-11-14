@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { AlertTriangle, CalendarDays, Check, ExternalLink, Eye, Loader2, PenLine, RefreshCw, Sparkles, Wand2 } from "lucide-react";
-import { CHANNEL_LABEL, KIND_DRAFT_TARGET, maxFor, type Channel, type MessageKind } from "@shared/channels";
+import { CHANNEL_LABEL, KIND_DRAFT_TARGET, LINKEDIN_NOTE_PREMIUM_MAX, maxFor, type Channel, type MessageKind } from "@shared/channels";
 import { LIMITS } from "@shared/outreach-check";
 import type { DraftBasis } from "@shared/draft-evidence";
 import { MikaCharacter } from "@/components/ai-league/nest-character";
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import type { DraftAllowanceNote } from "@/lib/draft-allowance";
@@ -112,7 +113,11 @@ export function Composer(p: ComposerProps) {
   const fail = (title: string) => (e: unknown) => toast({ title, description: leadError(e), variant: "destructive" });
   const done = () => { p.refresh(); void refreshDraftAllowance(); };
   const isEmail = p.channel === "email";
-  const max = isEmail ? LIMITS.bodyMax : maxFor(kind as MessageKind);
+  // LinkedIn allows a longer connection note on a Premium account. It is the person's own account, so they tell us.
+  const [premium, setPremium] = useState(false);
+  const noteKind = (m?.kind ?? kind) as MessageKind;
+  const isNote = !isEmail && noteKind === "connection_note";
+  const max = isEmail ? LIMITS.bodyMax : maxFor(noteKind, premium);
   const editable = !!m && (m.status === "draft" || m.status === "approved") && p.canEdit;
   const dirty = !!m && (body !== m.body || (isEmail && subject !== (m.subject ?? "")));
   useEffect(() => { p.onDirtyChange?.(dirty || own); }, [dirty, own]);
@@ -125,13 +130,13 @@ export function Composer(p: ComposerProps) {
         if (how === "own") return leadCall("POST", draftUrl(p.leadId), { write: "own", subject, body });
         return leadCall("POST", draftUrl(p.leadId), how === "versions" ? { variants: true, confirmFit: fitConfirmed } : { confirmFit: fitConfirmed });
       }
-      return leadCall("POST", channelDraftUrl(p.leadId), { channel: p.channel, kind, to: p.pendingTo.trim() || null, write: how === "own" ? "own" : "ai", ...(how === "own" ? { text: body } : {}) });
+      return leadCall("POST", channelDraftUrl(p.leadId), { channel: p.channel, kind, to: p.pendingTo.trim() || null, write: how === "own" ? "own" : "ai", premium, ...(how === "own" ? { text: body } : {}) });
     },
     onSuccess: () => { setOwn(false); done(); },
     onError: (e) => { done(); fail("Mika couldn't write it")(e); },
   });
   const save = useMutation({
-    mutationFn: () => isEmail ? leadCall("PATCH", messageUrl(m!.id), { subject, body }) : leadCall("PATCH", channelMessageUrl(m!.id), { text: body }),
+    mutationFn: () => isEmail ? leadCall("PATCH", messageUrl(m!.id), { subject, body }) : leadCall("PATCH", channelMessageUrl(m!.id), { text: body, premium }),
     onSuccess: () => { done(); toast({ title: "Saved" }); },
     onError: fail("Couldn't save your changes"),
   });
@@ -301,6 +306,12 @@ export function Composer(p: ComposerProps) {
             <span className={cn("tabular-nums", tooLong ? "text-destructive" : "text-muted-foreground")} aria-live="polite">
               {tooLong ? `${body.length - max} characters over the limit` : isEmail ? `${body.trim().length} / ${max}` : `${body.length} / ${max}${!isEmail && body.length > KIND_DRAFT_TARGET[(m?.kind ?? kind) as MessageKind].max ? " · shorter messages get more replies" : ""}`}
             </span>
+            {isNote && (
+              <label className="inline-flex items-center gap-2 text-muted-foreground" data-testid="studio-linkedin-premium">
+                <Switch checked={premium} onCheckedChange={setPremium} aria-label="I have LinkedIn Premium" />
+                I have LinkedIn Premium ({LINKEDIN_NOTE_PREMIUM_MAX} characters)
+              </label>
+            )}
             <span className="w-32 text-right text-muted-foreground" data-testid="studio-save-state">{save.isPending ? "Saving…" : dirty ? "Not saved yet" : m ? "Saved" : "Not saved yet"}</span>
           </div>
           {m?.status === "approved" && <p className="text-xs text-muted-foreground">Approved. Editing moves it back to a draft, and you'll approve it again.</p>}

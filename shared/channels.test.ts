@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkChannelDraft, checkChannelText, externalUrl, instagramHandle, isStopReply, linkedinUrl, maxFor, messengerPage, normalPhone, statusLabel, xHandle } from "./channels";
+import { SIGN_IN_NEEDED, checkChannelDraft, checkChannelText, draftAim, draftRange, externalUrl, instagramHandle, isStopReply, linkedinUrl, maxFor, messengerPage, normalPhone, profileUrl, statusLabel, xHandle } from "./channels";
 
 describe("channel rules", () => {
   it("normalizes phone numbers to E.164 and refuses anything else", () => {
@@ -84,3 +84,75 @@ describe("Instagram and Messenger addresses", () => {
   });
 });
 
+describe("a LinkedIn connection note: asked for less than will be accepted", () => {
+  const note = (n: number) => "a".repeat(n);
+  const ctx = { siteHost: "example.com" };
+
+  it("the ASK leaves room for a model that cannot count characters", () => {
+    // The whole bug: the note's accepted length IS LinkedIn's ceiling, so asking for the ceiling produced 210-odd
+    // twice and the person got a refusal (production, 14 Nov 2026). The ask is now a fifth lower.
+    expect(draftRange("connection_note").max).toBe(200);
+    expect(draftAim("connection_note").max).toBe(160);
+    expect(draftAim("connection_note").max).toBeLessThan(draftRange("connection_note").max);
+  });
+
+  it("a note a little over the asked-for length is still accepted", () => {
+    expect(checkChannelDraft(note(170), "connection_note", ctx)).toEqual([]);
+    expect(checkChannelDraft(note(200), "connection_note", ctx)).toEqual([]);
+    expect(checkChannelDraft(note(201), "connection_note", ctx)[0].code).toBe("body_length");
+  });
+
+  it("too short is still too short: the floor did not move", () => {
+    expect(checkChannelDraft(note(59), "connection_note", ctx)[0].code).toBe("body_length");
+    expect(checkChannelDraft(note(60), "connection_note", ctx)).toEqual([]);
+  });
+
+  it("a Premium account's longer note is accepted from a model too, and asked for accordingly", () => {
+    expect(checkChannelDraft(note(250), "connection_note", ctx)[0].code).toBe("body_length");
+    expect(checkChannelDraft(note(250), "connection_note", { ...ctx, premium: true })).toEqual([]);
+    expect(checkChannelDraft(note(301), "connection_note", { ...ctx, premium: true })[0].code).toBe("body_length");
+    expect(draftRange("connection_note", true).max).toBe(300);
+    expect(draftAim("connection_note", true).max).toBe(240);
+  });
+
+  it("every other kind is unchanged: its accepted length was never its hard ceiling", () => {
+    for (const k of ["text", "message", "dm", "ig_dm", "fb_message"] as const) {
+      expect(draftRange(k).max, k).toBeLessThan(maxFor(k));
+      expect(draftAim(k).max, k).toBeLessThanOrEqual(draftRange(k).max);
+    }
+    expect(checkChannelDraft("a".repeat(600), "text", ctx)).toEqual([]);
+    expect(checkChannelDraft("a".repeat(601), "text", ctx)[0].code).toBe("body_length");
+  });
+
+  it("the ask never collapses below the floor", () => {
+    for (const k of ["text", "template", "connection_note", "message", "dm", "ig_dm", "fb_message"] as const) {
+      expect(draftAim(k).max, k).toBeGreaterThan(draftAim(k).min);
+    }
+  });
+});
+
+describe("Instagram and Messenger: the message link needs a sign-in, so the profile is offered too", () => {
+  it("the public profile opens for anyone", () => {
+    expect(profileUrl("instagram", "socialpanga")).toBe("https://www.instagram.com/socialpanga/");
+    expect(profileUrl("messenger", "SmileDentalSiliguri")).toBe("https://www.facebook.com/SmileDentalSiliguri");
+  });
+
+  it("only those two need it: a LinkedIn or X destination is already a profile", () => {
+    for (const c of ["linkedin", "x", "whatsapp"] as const) {
+      expect(profileUrl(c, "someone"), c).toBeNull();
+      expect(SIGN_IN_NEEDED[c], c).toBeUndefined();
+    }
+    expect(profileUrl("instagram", null)).toBeNull();
+  });
+
+  it("the note says what to do when a login page appears", () => {
+    expect(SIGN_IN_NEEDED.instagram).toMatch(/signed in to Instagram/);
+    expect(SIGN_IN_NEEDED.instagram).toMatch(/open their profile instead/);
+    expect(SIGN_IN_NEEDED.messenger).toMatch(/signed in to Facebook/);
+  });
+
+  it("the message links themselves are unchanged: they are Meta's own and they do work when signed in", () => {
+    expect(externalUrl("instagram", "socialpanga")).toBe("https://ig.me/m/socialpanga");
+    expect(externalUrl("messenger", "socialpanga")).toBe("https://m.me/socialpanga");
+  });
+});

@@ -327,7 +327,7 @@ export async function draftChannelMessage(user: Who, leadId: number, raw: unknow
     if (issues.length) return fail(422, "invalid_text", issues[0].message, { issues: issues.map((x) => x.code) });
     body = (i.text ?? "").replace(/\r\n/g, "\n").trim();
   } else {
-    const ai = await aiDraft(user, lead, claims, channel, kind, deps);
+    const ai = await aiDraft(user, lead, claims, channel, kind, deps, i.premium === true);
     if (!ai.ok) return ai;
     ({ body, claimIds, retried, style: followed, basis } = ai);
     promptVersion = CHANNEL_PROMPT_VERSION;
@@ -355,7 +355,7 @@ const draftLimit = (tier: OutboundTier, max: number) => tier === "free"
   ? fail(402, "NO_CREDITS", `You've used the free plan's ${max} AI drafts for this 30-day period. Upgrade to Pro for more, buy extra AI drafts, or write this message yourself.`, { feature: "outbound", topUp: "draft" })
   : fail(429, "draft_allowance", `You've used the ${max} AI drafts included in ${TIER_LABEL[tier]} for this 30-day period; you can buy extra AI drafts or write this message yourself.`, { topUp: "draft" });
 
-async function aiDraft(user: Who, lead: any, claims: any[], channel: ShortChannel, kind: MessageKind, deps: ChannelDeps): Promise<{ ok: true; body: string; claimIds: number[]; retried: boolean; style: DraftStyle | null; basis: ReturnType<typeof basisOf> } | ReturnType<typeof fail>> {
+async function aiDraft(user: Who, lead: any, claims: any[], channel: ShortChannel, kind: MessageKind, deps: ChannelDeps, premium = false): Promise<{ ok: true; body: string; claimIds: number[]; retried: boolean; style: DraftStyle | null; basis: ReturnType<typeof basisOf> } | ReturnType<typeof fail>> {
   if (kind === "template") return fail(400, "invalid", "A template's wording is fixed by WhatsApp; fill in its values instead.");
   const orgId = user.organizationId!;
   const scoreClaims: ScoreClaim[] = claims.map((c) => ({ id: c.id, field: c.field, value: c.value, status: c.status, evidenceUrl: c.evidenceUrl, createdAt: c.createdAt }));
@@ -393,14 +393,14 @@ async function aiDraft(user: Who, lead: any, claims: any[], channel: ShortChanne
   input.lead = leadItem ? { grade: leadItem.grade, label: leadItem.label, value: leadItem.value, date: leadItem.date, dating: leadItem.dating } : null;
   const site = siteHost(lead.domain || (() => { try { return new URL(lead.website ?? "").hostname; } catch { return ""; } })());
   const trace = { task: "draft" as const, orgId, userId: user.id, leadId: lead.id, promptVersion: CHANNEL_PROMPT_VERSION };
-  const messages: ChatMessage[] = [{ role: "system", content: channelSystemPrompt(channel, kind, input.style, input.lead) }, { role: "user", content: channelUserMessage(input) }];
+  const messages: ChatMessage[] = [{ role: "system", content: channelSystemPrompt(channel, kind, input.style, input.lead, premium) }, { role: "user", content: channelUserMessage(input) }];
   let text: string | null = null, issues: { code: string; message: string }[] = [], retried = false;
   try {
     for (let attempt = 0; attempt < 2; attempt++) {
       const reply = await deps.chat(trace, messages, { maxTokens: 1200, model: modelFor("draft") });
       const raw = parseJsonObject(reply.content) as { text?: unknown } | null;
       text = raw && typeof raw.text === "string" ? raw.text.replace(/\r\n/g, "\n").trim() : null;
-      issues = text ? [...checkChannelDraft(text, kind, { siteHost: site }), ...scopeIssues({ subject: "", body: text }, scope)] : [{ code: "body_length", message: "Reply with only the JSON object: {\"text\":...}." }];
+      issues = text ? [...checkChannelDraft(text, kind, { siteHost: site, premium }), ...scopeIssues({ subject: "", body: text }, scope)] : [{ code: "body_length", message: "Reply with only the JSON object: {\"text\":...}." }];
       if (!issues.length) break;
       retried = true;
       messages.push({ role: "assistant", content: reply.content ?? "" }, { role: "user", content: `That message cannot be used. Fix these problems and return the JSON object again:\n${issues.map((x) => `- ${x.message}`).join("\n")}` });

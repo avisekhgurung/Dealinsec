@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { leadCall, leadError, refreshLeads } from "@/lib/leads";
 import { cn } from "@/lib/utils";
 import { memberCan } from "@shared/permissions";
-import { CHANNEL_LABEL, KIND_LABEL, MESSAGE_KINDS, externalUrl, maxFor, type Channel, type ChannelStatus, type MessageKind, type ShortChannel } from "@shared/channels";
+import { CHANNEL_LABEL, KIND_LABEL, MESSAGE_KINDS, SIGN_IN_NEEDED, externalUrl, maxFor, profileUrl, type Channel, type ChannelStatus, type MessageKind, type ShortChannel } from "@shared/channels";
 import { SegmentedTabs } from "@/components/outbound/segmented-tabs";
 import { OutreachPanel } from "./outreach-panel";
 import { DraftAllowanceLine, refreshDraftAllowance, useDraftAllowance } from "./draft-allowance-line";
@@ -271,6 +271,10 @@ function MessageEditor({ m, api, canRun, contacts, search, onDone, onFail }: { m
   const busy = save.isPending || approve.isPending || sendApi.isPending || sent.isPending || resolve.isPending || cancel.isPending;
   const copy = async () => { try { await navigator.clipboard.writeText(m.body ?? ""); toast({ title: "Copied", description: "Copying doesn't send it. Paste it, send it, then press \"I sent it\"." }); } catch { toast({ title: "Couldn't copy", description: "Select the text and copy it yourself.", variant: "destructive" }); } };
   const open = m.channel === "whatsapp" ? (m.to ? waMeUrl(m.to, m.body ?? "") : null) : externalUrl(m.channel, m.to, search);
+  // Instagram's and Messenger's message links need the person signed in to that app in this browser; signed out they
+  // land on a login page. Their public profile always opens, so it is offered too (shared/channels.ts profileUrl).
+  const profile = profileUrl(m.channel, m.to);
+  const signInNote = SIGN_IN_NEEDED[m.channel] ?? null;
   const windowOpen = contacts.find((c) => c.phone === m.to)?.windowOpenUntil;
   const editable = m.status === "draft" || editing;
 
@@ -302,10 +306,14 @@ function MessageEditor({ m, api, canRun, contacts, search, onDone, onFail }: { m
               : <>
                 <Button size="sm" variant="outline" onClick={copy} disabled={busy} data-testid="channel-copy"><Copy className="mr-1.5 h-4 w-4" />Copy</Button>
                 {open && <Button size="sm" variant="outline" asChild><a href={open} target="_blank" rel="noopener noreferrer" data-testid="channel-open"><ExternalLink className="mr-1.5 h-4 w-4" />{m.channel === "whatsapp" ? "Open WhatsApp" : m.to ? `Open on ${CHANNEL_LABEL[m.channel]}` : `Find them on ${CHANNEL_LABEL[m.channel]}`}</a></Button>}
+                {profile && <Button size="sm" variant="ghost" asChild><a href={profile} target="_blank" rel="noopener noreferrer" data-testid="channel-open-profile"><ExternalLink className="mr-1.5 h-4 w-4" />Their profile</a></Button>}
                 <Button size="sm" onClick={() => sent.mutate()} disabled={busy} data-testid="channel-sent">{sent.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCheck className="mr-1.5 h-4 w-4" />}I sent it</Button>
               </>}
             {m.kind !== "template" && <Button size="sm" variant="ghost" onClick={() => setEditing(true)} disabled={busy} data-testid="channel-edit"><Pencil className="mr-1.5 h-4 w-4" />Edit</Button>}
           </>}
+          {m.status === "approved" && !editing && signInNote && (
+            <p className="w-full text-xs text-muted-foreground" data-testid="channel-sign-in-note">{signInNote}</p>
+          )}
           {m.status === "approved" && editing && (dirty
             ? <Button size="sm" onClick={() => save.mutate()} disabled={busy || text.length > max}>Save (needs approving again)</Button>
             : <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Keep as approved</Button>)}

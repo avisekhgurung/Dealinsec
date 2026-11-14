@@ -23,6 +23,7 @@ import {
   mailtoUrl, openLabel, openUrlFor, replyNoteUrl, type StudioMessage,
 } from "@/lib/studio";
 import { cn } from "@/lib/utils";
+import { SIGN_IN_NEEDED, profileUrl, type ShortChannel } from "@shared/channels";
 
 export interface ActionsPanelProps {
   leadId: number;
@@ -117,6 +118,10 @@ export function ActionsPanel(p: ActionsPanelProps) {
   const busy = approve.isPending || markSent.isPending || discard.isPending || emailHandOut.isPending || saveTo.isPending;
   const unsent = !!m && ["draft", "approved"].includes(m.status);
   const openHref = m && !isEmail ? openUrlFor({ channel: p.channel, to: m.to, subject: null, body: m.body }, p.company) : null;
+  // Instagram's and Messenger's message links only open for someone already signed in to that app here; signed out
+  // they land on a login page. So their public profile is offered beside the link (shared/channels.ts profileUrl).
+  const profileHref = m && !isEmail ? profileUrl(p.channel as ShortChannel, m.to) : null;
+  const signInNote = !isEmail ? SIGN_IN_NEEDED[p.channel as ShortChannel] ?? null : null;
   const activity = p.events.filter((e) => OUTREACH_EVENT_KINDS.has(e.kind) && (e.kind === "status_changed" || eventChannel(e) === p.channel)).slice(0, 8);
   const destination = isEmail ? (m?.to ?? p.leadEmail) : null;
 
@@ -180,7 +185,15 @@ export function ActionsPanel(p: ActionsPanelProps) {
                   ) : (
                     <Button variant="outline" disabled title={DESTINATION[p.channel].missing}><ExternalLink className="mr-1.5 h-4 w-4" />{CHANNEL_LABEL[p.channel]}</Button>
                   )}
+                  {profileHref && (
+                    <Button variant="ghost" asChild>
+                      <a href={profileHref} target="_blank" rel="noopener noreferrer" data-testid="studio-open-profile">
+                        <ExternalLink className="mr-1.5 h-4 w-4" />Their profile
+                      </a>
+                    </Button>
+                  )}
                 </div>
+                {signInNote && <p className="text-xs text-muted-foreground" data-testid="studio-sign-in-note">{signInNote}</p>}
                 <p className="text-xs text-muted-foreground">{isEmail ? `${openLabel("email")} fills in the email; you press send there.` : p.channel === "whatsapp" ? "WhatsApp opens with the message filled in." : `Paste the message on ${CHANNEL_LABEL[p.channel]} and send it there.`}</p>
                 <Button onClick={() => void iSentIt()} disabled={busy || p.dirty} variant={isEmail && gmail.ready ? "outline" : "default"} data-testid="studio-mark-sent">
                   {markSent.isPending ? <Spin /> : <CheckCheck className="mr-1.5 h-4 w-4" />}I sent it
